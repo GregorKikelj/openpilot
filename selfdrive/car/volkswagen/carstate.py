@@ -211,7 +211,7 @@ class CarState(CarStateBase):
     signals += [("Kupplungsschalter", "Motor_1", 0),  # Clutch switch
                 ("GK1_Rueckfahr", "Gate_Komf_1", 0)]  # Reverse light from BCM
 
-    return CANParser(DBC_FILES.pq, signals, checks, CANBUS.pt)
+    return CANParser(DBC_FILES.pq, signals, checks, CANBUS.pt, enforce_checks=False)
 
   @staticmethod
   def get_pq_cam_can_parser(CP):
