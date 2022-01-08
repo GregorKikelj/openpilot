@@ -13,7 +13,7 @@ def apply_deadzone(error, deadzone):
   return error
 
 class PIController():
-  def __init__(self, k_p, k_i, k_f, pos_limit=None, neg_limit=None, rate=100, sat_limit=0.8):
+  def __init__(self, k_p, k_i, k_f=0.0, pos_limit=None, neg_limit=None, rate=100, sat_limit=0.8):
     self._k_p = k_p  # proportional gain
     self._k_i = k_i  # integral gain
     self._k_f = k_f   # feedforward gain
