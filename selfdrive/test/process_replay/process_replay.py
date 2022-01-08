@@ -89,7 +89,7 @@ class DumbSocket:
 
 class FakeSubMaster(messaging.SubMaster):
   def __init__(self, services):
-    super(FakeSubMaster, self).__init__(services, addr=None)
+    super().__init__(services, addr=None)
     self.sock = {s: DumbSocket(s) for s in services}
     self.update_called = threading.Event()
     self.update_ready = threading.Event()
@@ -111,7 +111,7 @@ class FakeSubMaster(messaging.SubMaster):
   def update_msgs(self, cur_time, msgs):
     wait_for_event(self.update_called)
     self.update_called.clear()
-    super(FakeSubMaster, self).update_msgs(cur_time, msgs)
+    super().update_msgs(cur_time, msgs)
     self.update_ready.set()
 
   def wait_for_update(self):
@@ -240,7 +240,7 @@ CONFIGS = [
     proc_name="controlsd",
     pub_sub={
       "can": ["controlsState", "carState", "carControl", "sendcan", "carEvents", "carParams"],
-      "deviceState": [], "pandaState": [], "liveCalibration": [], "driverMonitoringState": [], "longitudinalPlan": [], "lateralPlan": [], "liveLocationKalman": [], "liveParameters": [], "radarState": [],
+      "deviceState": [], "pandaStates": [], "peripheralState": [], "liveCalibration": [], "driverMonitoringState": [], "longitudinalPlan": [], "lateralPlan": [], "liveLocationKalman": [], "liveParameters": [], "radarState": [],
       "modelV2": [], "driverCameraState": [], "roadCameraState": [], "ubloxRaw": [], "managerState": [],
     },
     ignore=["logMonoTime", "valid", "controlsState.startMonoTime", "controlsState.cumLagMs"],
@@ -264,13 +264,13 @@ CONFIGS = [
   ProcessConfig(
     proc_name="plannerd",
     pub_sub={
-      "modelV2": ["lateralPlan"], "radarState": ["longitudinalPlan"],
-      "carState": [], "controlsState": [],
+      "modelV2": ["lateralPlan", "longitudinalPlan"],
+      "carState": [], "controlsState": [], "radarState": [],
     },
     ignore=["logMonoTime", "valid", "longitudinalPlan.processingDelay"],
     init_callback=get_car_params,
     should_recv_callback=None,
-    tolerance=None,
+    tolerance=NUMPY_TOLERANCE,
     fake_pubsubmaster=True,
   ),
   ProcessConfig(
@@ -341,6 +341,15 @@ def replay_process(cfg, lr, fingerprint=None):
   else:
     return cpp_replay_process(cfg, lr, fingerprint)
 
+def setup_env():
+  params = Params()
+  params.clear_all()
+  params.put_bool("OpenpilotEnabledToggle", True)
+  params.put_bool("Passive", False)
+  params.put_bool("CommunityFeaturesToggle", True)
+
+  os.environ['NO_RADAR_SLEEP'] = "1"
+  os.environ["SIMULATION"] = "1"
 
 def python_replay_process(cfg, lr, fingerprint=None):
   sub_sockets = [s for _, sub in cfg.pub_sub.items() for s in sub]
@@ -356,21 +365,14 @@ def python_replay_process(cfg, lr, fingerprint=None):
   all_msgs = sorted(lr, key=lambda msg: msg.logMonoTime)
   pub_msgs = [msg for msg in all_msgs if msg.which() in list(cfg.pub_sub.keys())]
 
-  params = Params()
-  params.clear_all()
-  params.put_bool("OpenpilotEnabledToggle", True)
-  params.put_bool("Passive", False)
-  params.put_bool("CommunityFeaturesToggle", True)
-
-  os.environ['NO_RADAR_SLEEP'] = "1"
-  os.environ["SIMULATION"] = "1"
-
+  setup_env()
 
   # TODO: remove after getting new route for civic & accord
   migration = {
     "HONDA CIVIC 2016 TOURING": "HONDA CIVIC 2016",
     "HONDA ACCORD 2018 SPORT 2T": "HONDA ACCORD 2018",
     "HONDA ACCORD 2T 2018": "HONDA ACCORD 2018",
+    "Mazda CX-9 2021": "MAZDA CX-9 2021",
   }
 
   if fingerprint is not None:
@@ -383,7 +385,7 @@ def python_replay_process(cfg, lr, fingerprint=None):
       if msg.which() == 'carParams':
         car_fingerprint = migration.get(msg.carParams.carFingerprint, msg.carParams.carFingerprint)
         if len(msg.carParams.carFw) and (car_fingerprint in FW_VERSIONS):
-          params.put("CarParamsCache", msg.carParams.as_builder().to_bytes())
+          Params().put("CarParamsCache", msg.carParams.as_builder().to_bytes())
         else:
           os.environ['SKIP_FW_QUERY'] = "1"
           os.environ['FINGERPRINT'] = car_fingerprint
@@ -401,7 +403,7 @@ def python_replay_process(cfg, lr, fingerprint=None):
       can_sock = None
     cfg.init_callback(all_msgs, fsm, can_sock, fingerprint)
 
-  CP = car.CarParams.from_bytes(params.get("CarParams", block=True))
+  CP = car.CarParams.from_bytes(Params().get("CarParams", block=True))
 
   # wait for started process to be ready
   if 'can' in list(cfg.pub_sub.keys()):
@@ -429,7 +431,10 @@ def python_replay_process(cfg, lr, fingerprint=None):
 
       recv_cnt = len(recv_socks)
       while recv_cnt > 0:
-        m = fpm.wait_for_msg()
+        m = fpm.wait_for_msg().as_builder()
+        m.logMonoTime = msg.logMonoTime
+        m = m.as_reader()
+
         log_msgs.append(m)
         recv_cnt -= m.which() in recv_socks
   return log_msgs
@@ -442,6 +447,8 @@ def cpp_replay_process(cfg, lr, fingerprint=None):
   all_msgs = sorted(lr, key=lambda msg: msg.logMonoTime)
   pub_msgs = [msg for msg in all_msgs if msg.which() in list(cfg.pub_sub.keys())]
   log_msgs = []
+
+  setup_env()
 
   managed_processes[cfg.proc_name].prepare()
   managed_processes[cfg.proc_name].start()
@@ -466,6 +473,10 @@ def cpp_replay_process(cfg, lr, fingerprint=None):
           if response is None:
             print(f"Warning, no response received {i}")
           else:
+
+            response = response.as_builder()
+            response.logMonoTime = msg.logMonoTime
+            response = response.as_reader()
             log_msgs.append(response)
 
         if not len(resp_sockets):  # We only need to wait if we didn't already wait for a response

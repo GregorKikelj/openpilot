@@ -26,15 +26,15 @@ from common.file_helpers import CallbackReader
 from common.basedir import PERSIST
 from common.params import Params
 from common.realtime import sec_since_boot
-from selfdrive.hardware import HARDWARE, PC, TICI
+from selfdrive.hardware import HARDWARE, PC
 from selfdrive.loggerd.config import ROOT
 from selfdrive.loggerd.xattr_cache import getxattr, setxattr
 from selfdrive.swaglog import cloudlog, SWAGLOG_DIR
-from selfdrive.version import version, get_version, get_git_remote, get_git_branch, get_git_commit
+from selfdrive.version import get_version, get_origin, get_short_branch, get_commit
 
 ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
-LOCAL_PORT_WHITELIST = set([8022])
+LOCAL_PORT_WHITELIST = {8022}
 
 LOG_ATTR_NAME = 'user.upload'
 LOG_ATTR_VALUE_MAX_UNIX_TIME = int.to_bytes(2147483647, 4, sys.byteorder)
@@ -54,6 +54,28 @@ cancelled_uploads: Any = set()
 UploadItem = namedtuple('UploadItem', ['path', 'url', 'headers', 'created_at', 'id', 'retry_count', 'current', 'progress'], defaults=(0, False, 0))
 
 cur_upload_items = {}
+
+
+class UploadQueueCache():
+  params = Params()
+
+  @staticmethod
+  def initialize(upload_queue):
+    try:
+      upload_queue_json = UploadQueueCache.params.get("AthenadUploadQueue")
+      if upload_queue_json is not None:
+        for item in json.loads(upload_queue_json):
+          upload_queue.put(UploadItem(**item))
+    except Exception:
+      cloudlog.exception("athena.UploadQueueCache.initialize.exception")
+
+  @staticmethod
+  def cache(upload_queue):
+    try:
+      items = [i._asdict() for i in upload_queue.queue if i.id not in cancelled_uploads]
+      UploadQueueCache.params.put("AthenadUploadQueue", json.dumps(items))
+    except Exception:
+      cloudlog.exception("athena.UploadQueueCache.cache.exception")
 
 
 def handle_long_poll(ws):
@@ -111,6 +133,7 @@ def upload_handler(end_event):
 
     try:
       cur_upload_items[tid] = upload_queue.get(timeout=1)._replace(current=True)
+
       if cur_upload_items[tid].id in cancelled_uploads:
         cancelled_uploads.remove(cur_upload_items[tid].id)
         continue
@@ -120,6 +143,7 @@ def upload_handler(end_event):
           cur_upload_items[tid] = cur_upload_items[tid]._replace(progress=cur / sz if sz else 1)
 
         _do_upload(cur_upload_items[tid], cb)
+        UploadQueueCache.cache(upload_queue)
       except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.SSLError) as e:
         cloudlog.warning(f"athena.upload_handler.retry {e} {cur_upload_items[tid]}")
 
@@ -131,6 +155,8 @@ def upload_handler(end_event):
             current=False
           )
           upload_queue.put_nowait(item)
+          UploadQueueCache.cache(upload_queue)
+
           cur_upload_items[tid] = None
 
           for _ in range(RETRY_DELAY):
@@ -176,17 +202,19 @@ def getMessage(service=None, timeout=1000):
 def getVersion():
   return {
     "version": get_version(),
-    "remote": get_git_remote(),
-    "branch": get_git_branch(),
-    "commit": get_git_commit(),
+    "remote": get_origin(),
+    "branch": get_short_branch(),
+    "commit": get_commit(),
   }
 
 
 @dispatcher.add_method
-def setNavDestination(latitude=0, longitude=0):
+def setNavDestination(latitude=0, longitude=0, place_name=None, place_details=None):
   destination = {
     "latitude": latitude,
     "longitude": longitude,
+    "place_name": place_name,
+    "place_details": place_details,
   }
   Params().put("NavDestination", json.dumps(destination))
 
@@ -235,42 +263,59 @@ def reboot():
 
 @dispatcher.add_method
 def uploadFileToUrl(fn, url, headers):
-  if len(fn) == 0 or fn[0] == '/' or '..' in fn:
-    return 500
-  path = os.path.join(ROOT, fn)
-  if not os.path.exists(path):
-    return 404
+  return uploadFilesToUrls([[fn, url, headers]])
 
-  item = UploadItem(path=path, url=url, headers=headers, created_at=int(time.time() * 1000), id=None)
-  upload_id = hashlib.sha1(str(item).encode()).hexdigest()
-  item = item._replace(id=upload_id)
 
-  upload_queue.put_nowait(item)
+@dispatcher.add_method
+def uploadFilesToUrls(files_data):
+  items = []
+  failed = []
+  for fn, url, headers in files_data:
+    if len(fn) == 0 or fn[0] == '/' or '..' in fn:
+      failed.append(fn)
+      continue
+    path = os.path.join(ROOT, fn)
+    if not os.path.exists(path):
+      failed.append(fn)
+      continue
 
-  return {"enqueued": 1, "item": item._asdict()}
+    item = UploadItem(path=path, url=url, headers=headers, created_at=int(time.time() * 1000), id=None)
+    upload_id = hashlib.sha1(str(item).encode()).hexdigest()
+    item = item._replace(id=upload_id)
+    upload_queue.put_nowait(item)
+    items.append(item._asdict())
+
+  UploadQueueCache.cache(upload_queue)
+
+  resp = {"enqueued": len(items), "items": items}
+  if failed:
+    resp["failed"] = failed
+
+  return resp
 
 
 @dispatcher.add_method
 def listUploadQueue():
   items = list(upload_queue.queue) + list(cur_upload_items.values())
-  return [i._asdict() for i in items if i is not None]
+  return [i._asdict() for i in items if (i is not None) and (i.id not in cancelled_uploads)]
 
 
 @dispatcher.add_method
 def cancelUpload(upload_id):
-  upload_ids = set(item.id for item in list(upload_queue.queue))
-  if upload_id not in upload_ids:
+  if not isinstance(upload_id, list):
+    upload_id = [upload_id]
+
+  uploading_ids = {item.id for item in list(upload_queue.queue)}
+  cancelled_ids = uploading_ids.intersection(upload_id)
+  if len(cancelled_ids) == 0:
     return 404
 
-  cancelled_uploads.add(upload_id)
+  cancelled_uploads.update(cancelled_ids)
   return {"success": 1}
 
 
 @dispatcher.add_method
 def primeActivated(activated):
-  dongle_id = Params().get("DongleId", encoding='utf-8')
-  api = Api(dongle_id)
-  manage_tokens(api)
   return {"success": 1}
 
 
@@ -281,8 +326,7 @@ def startLocalProxy(global_end_event, remote_ws_uri, local_port):
 
     cloudlog.debug("athena.startLocalProxy.starting")
 
-    params = Params()
-    dongle_id = params.get("DongleId").decode('utf8')
+    dongle_id = Params().get("DongleId").decode('utf8')
     identity_token = Api(dongle_id).get_token()
     ws = create_connection(remote_ws_uri,
                            cookie="jwt=" + identity_token,
@@ -313,7 +357,7 @@ def getPublicKey():
   if not os.path.isfile(PERSIST + '/comma/id_rsa.pub'):
     return None
 
-  with open(PERSIST + '/comma/id_rsa.pub', 'r') as f:
+  with open(PERSIST + '/comma/id_rsa.pub') as f:
     return f.read()
 
 
@@ -394,7 +438,7 @@ def log_handler(end_event):
           curr_time = int(time.time())
           log_path = os.path.join(SWAGLOG_DIR, log_entry)
           setxattr(log_path, LOG_ATTR_NAME, int.to_bytes(curr_time, 4, sys.byteorder))
-          with open(log_path, "r") as f:
+          with open(log_path) as f:
             jsonrpc = {
               "method": "forwardLogs",
               "params": {
@@ -523,24 +567,10 @@ def backoff(retries):
   return random.randrange(0, min(128, int(2 ** retries)))
 
 
-def manage_tokens(api):
-  if not TICI:
-    return
-
-  try:
-    params = Params()
-    mapbox = api.get(f"/v1/tokens/mapbox/{api.dongle_id}/", timeout=5.0, access_token=api.get_token())
-    if mapbox.status_code == 200:
-      params.put("MapboxToken", mapbox.json()["token"])
-    else:
-      params.delete("MapboxToken")
-  except Exception:
-    cloudlog.exception("Failed to update tokens")
-
-
 def main():
   params = Params()
   dongle_id = params.get("DongleId", encoding='utf-8')
+  UploadQueueCache.initialize(upload_queue)
 
   ws_uri = ATHENA_HOST + "/ws/v2/" + dongle_id
   api = Api(dongle_id)
@@ -556,8 +586,6 @@ def main():
       cloudlog.event("athenad.main.connected_ws", ws_uri=ws_uri)
       params.delete("PrimeRedirected")
 
-      manage_tokens(api)
-
       conn_retries = 0
       cur_upload_items.clear()
 
@@ -571,7 +599,7 @@ def main():
     except socket.timeout:
       try:
         r = requests.get("http://api.commadotai.com/v1/me", allow_redirects=False,
-                         headers={"User-Agent": f"openpilot-{version}"}, timeout=15.0)
+                         headers={"User-Agent": f"openpilot-{get_version()}"}, timeout=15.0)
         if r.status_code == 302 and r.headers['Location'].startswith("http://u.web2go.com"):
           params.put_bool("PrimeRedirected", True)
       except Exception:

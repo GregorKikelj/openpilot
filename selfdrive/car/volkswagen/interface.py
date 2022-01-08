@@ -1,7 +1,7 @@
 from cereal import car
 from selfdrive.config import Conversions as CV
 from selfdrive.car.volkswagen.values import CAR, PQ_CARS, CANBUS, BUTTON_STATES, NetworkLocation, TransmissionType, GearShifter
-from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
+from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 
 EventName = car.CarEvent.EventName
@@ -25,7 +25,6 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=None):
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
     ret.carName = "volkswagen"
-    ret.communityFeature = True
     ret.radarOffCan = True
 
     if candidate in PQ_CARS:
@@ -45,8 +44,8 @@ class CarInterface(CarInterfaceBase):
 
     else:  # pylint: disable=using-constant-test
       # Set global MQB parameters
-      ret.safetyModel = car.CarParams.SafetyModel.volkswagen
-      ret.enableBsm = 0x30F in fingerprint[0]
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.volkswagen)]
+      ret.enableBsm = 0x30F in fingerprint[0]  # SWA_01
 
       if 0xAD in fingerprint[0]:
         # Getriebe_11 detected: traditional automatic or DSG gearbox
@@ -77,7 +76,11 @@ class CarInterface(CarInterfaceBase):
 
     # Per-chassis tuning values, override tuning defaults here if desired
 
-    if candidate == CAR.ATLAS_MK1:
+    if candidate == CAR.ARTEON_MK1:
+      ret.mass = 1733 + STD_CARGO_KG
+      ret.wheelbase = 2.84
+
+    elif candidate == CAR.ATLAS_MK1:
       ret.mass = 2011 + STD_CARGO_KG
       ret.wheelbase = 2.98
 
@@ -102,6 +105,13 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1503 + STD_CARGO_KG
       ret.wheelbase = 2.80
       ret.minSteerSpeed = 50 * CV.KPH_TO_MS  # May be lower depending on model-year/EPS FW
+    elif candidate == CAR.POLO_MK6:
+      ret.mass = 1230 + STD_CARGO_KG
+      ret.wheelbase = 2.55
+
+    elif candidate == CAR.TAOS_MK1:
+      ret.mass = 1498 + STD_CARGO_KG
+      ret.wheelbase = 2.69
 
     elif candidate == CAR.TCROSS_MK1:
       ret.mass = 1150 + STD_CARGO_KG
@@ -114,6 +124,15 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.TOURAN_MK2:
       ret.mass = 1516 + STD_CARGO_KG
       ret.wheelbase = 2.79
+
+    elif candidate == CAR.TRANSPORTER_T61:
+      ret.mass = 1926 + STD_CARGO_KG
+      ret.wheelbase = 3.00  # SWB, LWB is 3.40, TBD how to detect difference
+      ret.minSteerSpeed = 14.0
+
+    elif candidate == CAR.TROC_MK1:
+      ret.mass = 1413 + STD_CARGO_KG
+      ret.wheelbase = 2.63
 
     elif candidate == CAR.AUDI_A3_MK3:
       ret.mass = 1335 + STD_CARGO_KG
@@ -136,6 +155,14 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1227 + STD_CARGO_KG
       ret.wheelbase = 2.64
 
+    elif candidate == CAR.SKODA_KAMIQ_MK1:
+      ret.mass = 1265 + STD_CARGO_KG
+      ret.wheelbase = 2.66
+
+    elif candidate == CAR.SKODA_KAROQ_MK1:
+      ret.mass = 1278 + STD_CARGO_KG
+      ret.wheelbase = 2.66
+
     elif candidate == CAR.SKODA_KODIAQ_MK1:
       ret.mass = 1569 + STD_CARGO_KG
       ret.wheelbase = 2.79
@@ -152,16 +179,13 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1505 + STD_CARGO_KG
       ret.wheelbase = 2.84
 
-    # TODO: get actual value, for now starting with reasonable value for
-    # civic and scaling by mass and wheelbase
-    ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
+    else:
+      raise ValueError(f"unsupported car {candidate}")
 
-    # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
-    # mass and CG position, so all cars will have approximately similar dyn behaviors
+    ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
     ret.centerToFront = ret.wheelbase * 0.45
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
                                                                          tire_stiffness_factor=tire_stiffness_factor)
-
     return ret
 
   # returns a car.CarState
@@ -198,8 +222,16 @@ class CarInterface(CarInterfaceBase):
     # Vehicle health and operation safety checks
     if self.CS.parkingBrakeSet:
       events.add(EventName.parkBrake)
-    if ret.vEgo < self.CP.minSteerSpeed:
-      events.add(car.CarEvent.EventName.belowSteerSpeed)
+    if self.CS.tsk_status in [6, 7]:
+      events.add(EventName.accFaulted)
+
+    # Low speed steer alert hysteresis logic
+    if self.CP.minSteerSpeed > 0. and ret.vEgo < (self.CP.minSteerSpeed + 1.):
+      self.low_speed_alert = True
+    elif ret.vEgo > (self.CP.minSteerSpeed + 2.):
+      self.low_speed_alert = False
+    if self.low_speed_alert:
+      events.add(EventName.belowSteerSpeed)
 
     ret.events = events.to_msg()
     ret.buttonEvents = buttonEvents
@@ -212,11 +244,12 @@ class CarInterface(CarInterfaceBase):
     return self.CS.out
 
   def apply(self, c):
-    can_sends = self.CC.update(c.enabled, self.CS, self.frame, self.ext_bus, c.actuators,
-                   c.hudControl.visualAlert,
-                   c.hudControl.leftLaneVisible,
-                   c.hudControl.rightLaneVisible,
-                   c.hudControl.leftLaneDepart,
-                   c.hudControl.rightLaneDepart)
+    hud_control = c.hudControl
+    ret = self.CC.update(c.enabled, self.CS, self.frame, self.ext_bus, c.actuators,
+                         hud_control.visualAlert,
+                         hud_control.leftLaneVisible,
+                         hud_control.rightLaneVisible,
+                         hud_control.leftLaneDepart,
+                         hud_control.rightLaneDepart)
     self.frame += 1
-    return can_sends
+    return ret

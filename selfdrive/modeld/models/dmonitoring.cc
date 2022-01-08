@@ -3,30 +3,46 @@
 #include "libyuv.h"
 
 #include "selfdrive/common/mat.h"
+#include "selfdrive/common/modeldata.h"
 #include "selfdrive/common/params.h"
 #include "selfdrive/common/timing.h"
 #include "selfdrive/hardware/hw.h"
 
 #include "selfdrive/modeld/models/dmonitoring.h"
 
-#define MODEL_WIDTH 320
-#define MODEL_HEIGHT 640
-#define FULL_W 852 // should get these numbers from camerad
-
-void dmonitoring_init(DMonitoringModelState* s) {
-  s->is_rhd = Params().getBool("IsRHD");
-
-  const char *model_path = Hardware::PC() ? "../../models/dmonitoring_model.dlc" : "../../models/dmonitoring_model_q.dlc";
-  s->m = new DefaultRunModel(model_path, &s->output[0], OUTPUT_SIZE, USE_DSP_RUNTIME);
-  for (int x = 0; x < std::size(s->tensor); ++x) {
-    s->tensor[x] = (x - 128.f) * 0.0078125f;
-  }
-}
+constexpr int MODEL_WIDTH = 320;
+constexpr int MODEL_HEIGHT = 640;
 
 template <class T>
 static inline T *get_buffer(std::vector<T> &buf, const size_t size) {
   if (buf.size() < size) buf.resize(size);
   return buf.data();
+}
+
+static inline void init_yuv_buf(std::vector<uint8_t> &buf, const int width, int height) {
+  uint8_t *y = get_buffer(buf, width * height * 3 / 2);
+  uint8_t *u = y + width * height;
+  uint8_t *v = u + (width / 2) * (height / 2);
+
+  // needed on comma two to make the padded border black
+  // equivalent to RGB(0,0,0) in YUV space
+  memset(y, 16, width * height);
+  memset(u, 128, (width / 2) * (height / 2));
+  memset(v, 128, (width / 2) * (height / 2));
+}
+
+void dmonitoring_init(DMonitoringModelState* s) {
+  s->is_rhd = Params().getBool("IsRHD");
+  for (int x = 0; x < std::size(s->tensor); ++x) {
+    s->tensor[x] = (x - 128.f) * 0.0078125f;
+  }
+  init_yuv_buf(s->resized_buf, MODEL_WIDTH, MODEL_HEIGHT);
+
+#ifdef USE_ONNX_MODEL
+  s->m = new ONNXModel("../../models/dmonitoring_model.onnx", &s->output[0], OUTPUT_SIZE, USE_DSP_RUNTIME);
+#else
+  s->m = new SNPEModel("../../models/dmonitoring_model_q.dlc", &s->output[0], OUTPUT_SIZE, USE_DSP_RUNTIME);
+#endif
 }
 
 static inline auto get_yuv_buf(std::vector<uint8_t> &buf, const int width, int height) {
@@ -51,21 +67,18 @@ void crop_yuv(uint8_t *raw, int width, int height, uint8_t *y, uint8_t *u, uint8
 
 DMonitoringResult dmonitoring_eval_frame(DMonitoringModelState* s, void* stream_buf, int width, int height) {
   Rect crop_rect;
-  if (Hardware::TICI()) {
-    const int full_width_tici = 1928;
-    const int full_height_tici = 1208;
-    const int adapt_width_tici = 668;
-    const int cropped_height = adapt_width_tici / 1.33;
-    crop_rect = {full_width_tici / 2 - adapt_width_tici / 2,
-                 full_height_tici / 2 - cropped_height / 2 - 196,
+  if (width == TICI_CAM_WIDTH) {
+    const int cropped_height = tici_dm_crop::width / 1.33;
+    crop_rect = {width / 2 - tici_dm_crop::width / 2 + tici_dm_crop::x_offset,
+                 height / 2 - cropped_height / 2 + tici_dm_crop::y_offset,
                  cropped_height / 2,
                  cropped_height};
     if (!s->is_rhd) {
-      crop_rect.x += adapt_width_tici - crop_rect.w + 32;
+      crop_rect.x += tici_dm_crop::width - crop_rect.w;
     }
-
   } else {
-    crop_rect = {0, 0, height / 2, height};
+    const int adapt_width = 372;
+    crop_rect = {0, 0, adapt_width, height};
     if (!s->is_rhd) {
       crop_rect.x += width - crop_rect.w;
     }
@@ -92,7 +105,8 @@ DMonitoringResult dmonitoring_eval_frame(DMonitoringModelState* s, void* stream_
   auto [resized_buf, resized_u, resized_v] = get_yuv_buf(s->resized_buf, resized_width, resized_height);
   uint8_t *resized_y = resized_buf;
   libyuv::FilterMode mode = libyuv::FilterModeEnum::kFilterBilinear;
-  libyuv::I420Scale(cropped_y, crop_rect.w,
+  if (Hardware::TICI()) {
+    libyuv::I420Scale(cropped_y, crop_rect.w,
                     cropped_u, crop_rect.w / 2,
                     cropped_v, crop_rect.w / 2,
                     crop_rect.w, crop_rect.h,
@@ -101,6 +115,21 @@ DMonitoringResult dmonitoring_eval_frame(DMonitoringModelState* s, void* stream_
                     resized_v, resized_width / 2,
                     resized_width, resized_height,
                     mode);
+  } else {
+    const int source_height = 0.7*resized_height;
+    const int extra_height = (resized_height - source_height) / 2;
+    const int extra_width = (resized_width - source_height / 2) / 2;
+    const int source_width = source_height / 2 + extra_width;
+    libyuv::I420Scale(cropped_y, crop_rect.w,
+                    cropped_u, crop_rect.w / 2,
+                    cropped_v, crop_rect.w / 2,
+                    crop_rect.w, crop_rect.h,
+                    resized_y + extra_height * resized_width, resized_width,
+                    resized_u + extra_height / 2 * resized_width / 2, resized_width / 2,
+                    resized_v + extra_height / 2 * resized_width / 2, resized_width / 2,
+                    source_width, source_height,
+                    mode);
+  }
 
   int yuv_buf_len = (MODEL_WIDTH/2) * (MODEL_HEIGHT/2) * 6; // Y|u|v -> y|y|y|y|u|v
   float *net_input_buf = get_buffer(s->net_input_buf, yuv_buf_len);
@@ -125,7 +154,7 @@ DMonitoringResult dmonitoring_eval_frame(DMonitoringModelState* s, void* stream_
 
   //printf("preprocess completed. %d \n", yuv_buf_len);
   //FILE *dump_yuv_file = fopen("/tmp/rawdump.yuv", "wb");
-  //fwrite(raw_buf, height*width*3/2, sizeof(uint8_t), dump_yuv_file);
+  //fwrite(resized_buf, yuv_buf_len, sizeof(uint8_t), dump_yuv_file);
   //fclose(dump_yuv_file);
 
   // *** testing ***
@@ -159,6 +188,7 @@ DMonitoringResult dmonitoring_eval_frame(DMonitoringModelState* s, void* stream_
   ret.partial_face = s->output[35];
   ret.distracted_pose = s->output[36];
   ret.distracted_eyes = s->output[37];
+  ret.occluded_prob = s->output[38];
   ret.dsp_execution_time = (t2 - t1) / 1000.;
   return ret;
 }
@@ -185,6 +215,7 @@ void dmonitoring_publish(PubMaster &pm, uint32_t frame_id, const DMonitoringResu
   framed.setPartialFace(res.partial_face);
   framed.setDistractedPose(res.distracted_pose);
   framed.setDistractedEyes(res.distracted_eyes);
+  framed.setOccludedProb(res.occluded_prob);
   if (send_raw_pred) {
     framed.setRawPredictions(raw_pred.asBytes());
   }

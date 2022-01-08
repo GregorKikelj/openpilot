@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import print_function
 import math
 from cereal import car
 from opendbc.can.parser import CANParser
@@ -16,7 +15,7 @@ NUM_SLOTS = 20
 LAST_RADAR_MSG = RADAR_HEADER_MSG + NUM_SLOTS
 
 def create_radar_can_parser(car_fingerprint):
-  if car_fingerprint not in (CAR.VOLT, CAR.MALIBU, CAR.HOLDEN_ASTRA, CAR.ACADIA, CAR.CADILLAC_ATS):
+  if car_fingerprint not in (CAR.VOLT, CAR.MALIBU, CAR.HOLDEN_ASTRA, CAR.ACADIA, CAR.CADILLAC_ATS, CAR.ESCALADE_ESV):
     return None
 
   # C1A-ARS3-A by Continental

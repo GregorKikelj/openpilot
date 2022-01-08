@@ -1,5 +1,80 @@
-Version 0.8.9 (2021-XX-XX)
+Version 0.8.13 (2022-XX-XX)
 ========================
+ * Improved driver monitoring
+ * Improved camera focus on the comma two
+ * Subaru ECU firmware fingerprinting thanks to martinl!
+ * Hyundai Santa Fe Plug-in Hybrid 2022 support thanks to sunnyhaibin!
+ * Subaru Impreza 2020 support thanks to martinl!
+
+Version 0.8.12 (2021-12-15)
+========================
+ * New driving model
+   * Improved behavior around exits
+   * Better pose accuracy at high speeds, allowing max speed of 90mph
+   * Fully incorporated comma three data into all parts of training stack
+ * Improved follow distance
+ * Better longitudinal policy, especially in low speed traffic
+ * New alert sounds
+ * AGNOS 3
+   * Display burn in mitigation
+   * Improved audio amplifier configuration
+   * System reliability improvements
+   * Update Python to 3.8.10
+ * Raw logs upload moved to connect.comma.ai
+ * Fixed HUD alerts on newer Honda Bosch thanks to csouers!
+ * Audi Q3 2020-21 support thanks to jyoung8607!
+ * Lexus RC 2020 support thanks to ErichMoraga!
+
+Version 0.8.11 (2021-11-29)
+========================
+ * Support for CAN FD on the red panda
+ * Support for an external panda on the comma three
+ * Navigation: Show more detailed instructions when approaching maneuver
+ * Fixed occasional steering faults on GM cars thanks to jyoung8607!
+ * Nissan ECU firmware fingerprinting thanks to robin-reckmann, martinl, and razem-io!
+ * Cadillac Escalade ESV 2016 support thanks to Gibby!
+ * Genesis G70 2020 support thanks to tecandrew!
+ * Hyundai Santa Fe Hybrid 2022 support thanks to sunnyhaibin!
+ * Mazda CX-9 2021 support thanks to Jacar!
+ * Volkswagen Polo 2020 support thanks to jyoung8607!
+ * Volkswagen T-Roc 2021 support thanks to jyoung8607!
+
+Version 0.8.10 (2021-11-01)
+========================
+ * New driving model
+   * Trained on one million minutes!!!
+   * Fixed lead training making lead predictions significantly more accurate
+   * Fixed several localizer dataset bugs and loss function bugs, overall improved accuracy
+ * New driver monitoring model
+   * Trained on latest data from both comma two and comma three
+   * Increased model field of view by 40% on comma three
+   * Improved model stability on masked users
+   * Improved pose prediction with reworked ground-truth stack
+ * Lateral and longitudinal planning MPCs now in ACADOS
+ * Combined longitudinal MPCs
+   * All longitudinal planning now happens in a single MPC system
+   * Fixed instability in MPC problem to prevent sporadic CPU usage
+ * AGNOS 2: minor stability improvements and builder repo open sourced
+ * tools: new and improved replay thanks to deanlee!
+ * Moved community-supported cars outside of the Community Features toggle
+ * Improved FW fingerprinting reliability for Hyundai/Kia/Genesis
+ * Added prerequisites for longitudinal control on Hyundai/Kia/Genesis and Honda Bosch
+ * Audi S3 2015 support thanks to jyoung8607!
+ * Honda Freed 2020 support thanks to belm0!
+ * Hyundai Ioniq Hybrid 2020-2022 support thanks to sunnyhaibin!
+ * Hyundai Santa Fe 2022 support thanks to sunnyhaibin!
+ * Kia K5 2021 support thanks to sunnyhaibin!
+ * Škoda Kamiq 2021 support thanks to jyoung8607!
+ * Škoda Karoq 2019 support thanks to jyoung8607!
+ * Volkswagen Arteon 2021 support thanks to jyoung8607!
+ * Volkswagen California 2021 support thanks to jyoung8607!
+ * Volkswagen Taos 2022 support thanks to jyoung8607!
+
+Version 0.8.9 (2021-09-14)
+========================
+ * Improved fan control on comma three
+ * AGNOS 1.5: improved stability
+ * Honda e 2020 support
 
 Version 0.8.8 (2021-08-27)
 ========================

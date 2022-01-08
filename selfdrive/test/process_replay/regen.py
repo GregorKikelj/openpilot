@@ -39,8 +39,8 @@ def replay_service(s, msgs):
 vs = None
 def replay_cameras(lr, frs):
   cameras = [
-    ("roadCameraState", DT_MDL, eon_f_frame_size, VisionStreamType.VISION_STREAM_YUV_BACK),
-    ("driverCameraState", DT_DMON, eon_d_frame_size, VisionStreamType.VISION_STREAM_YUV_FRONT),
+    ("roadCameraState", DT_MDL, eon_f_frame_size, VisionStreamType.VISION_STREAM_ROAD),
+    ("driverCameraState", DT_DMON, eon_d_frame_size, VisionStreamType.VISION_STREAM_DRIVER),
   ]
 
   def replay_camera(s, stream, dt, vipc_server, fr, size):
@@ -118,7 +118,7 @@ def regen_segment(lr, frs=None, outdir=FAKEDATA):
     ],
     'pandad': [
       multiprocessing.Process(target=replay_service, args=('can', lr)),
-      multiprocessing.Process(target=replay_service, args=('pandaState', lr)),
+      multiprocessing.Process(target=replay_service, args=('pandaStates', lr)),
     ],
     #'managerState': [
     #  multiprocessing.Process(target=replay_service, args=('managerState', lr)),

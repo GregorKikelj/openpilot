@@ -3,10 +3,10 @@ from cereal import car
 from panda import Panda
 from common.numpy_fast import interp
 from common.params import Params
-from selfdrive.car.honda.values import CarControllerParams, CruiseButtons, CAR, HONDA_BOSCH, HONDA_BOSCH_ALT_BRAKE_SIGNAL
-from selfdrive.car.honda.hondacan import disable_radar
-from selfdrive.car import STD_CARGO_KG, CivicParams, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
+from selfdrive.car.honda.values import CarControllerParams, CruiseButtons, HondaFlags, CAR, HONDA_BOSCH, HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_ALT_BRAKE_SIGNAL
+from selfdrive.car import STD_CARGO_KG, CivicParams, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
+from selfdrive.car.disable_ecu import disable_ecu
 from selfdrive.config import Conversions as CV
 
 
@@ -17,36 +17,15 @@ TransmissionType = car.CarParams.TransmissionType
 
 class CarInterface(CarInterfaceBase):
   @staticmethod
-  def calc_accel_override(a_ego, a_target, v_ego, v_target):
-
-    # normalized max accel. Allowing max accel at low speed causes speed overshoots
-    max_accel_bp = [10, 20]    # m/s
-    max_accel_v = [0.714, 1.0]  # unit of max accel
-    max_accel = interp(v_ego, max_accel_bp, max_accel_v)
-
-    # limit the pcm accel cmd if:
-    # - v_ego exceeds v_target, or
-    # - a_ego exceeds a_target and v_ego is close to v_target
-
-    eA = a_ego - a_target
-    valuesA = [1.0, 0.1]
-    bpA = [0.3, 1.1]
-
-    eV = v_ego - v_target
-    valuesV = [1.0, 0.1]
-    bpV = [0.0, 0.5]
-
-    valuesRangeV = [1., 0.]
-    bpRangeV = [-1., 0.]
-
-    # only limit if v_ego is close to v_target
-    speedLimiter = interp(eV, bpV, valuesV)
-    accelLimiter = max(interp(eA, bpA, valuesA), interp(eV, bpRangeV, valuesRangeV))
-
-    # accelOverride is more or less the max throttle allowed to pcm: usually set to a constant
-    # unless aTargetMax is very high and then we scale with it; this help in quicker restart
-
-    return float(max(max_accel, a_target / CarControllerParams.ACCEL_MAX)) * min(speedLimiter, accelLimiter)
+  def get_pid_accel_limits(CP, current_speed, cruise_speed):
+    if CP.carFingerprint in HONDA_BOSCH:
+      return CarControllerParams.BOSCH_ACCEL_MIN, CarControllerParams.BOSCH_ACCEL_MAX
+    else:
+      # NIDECs don't allow acceleration near cruise_speed,
+      # so limit limits of pid to prevent windup
+      ACCEL_MAX_VALS = [CarControllerParams.NIDEC_ACCEL_MAX, 0.2]
+      ACCEL_MAX_BP = [cruise_speed - 2., cruise_speed - .2]
+      return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
@@ -54,7 +33,7 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "honda"
 
     if candidate in HONDA_BOSCH:
-      ret.safetyModel = car.CarParams.SafetyModel.hondaBoschHarness
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hondaBosch)]
       ret.radarOffCan = True
 
       # Disable the radar and let openpilot control longitudinal
@@ -62,9 +41,8 @@ class CarInterface(CarInterfaceBase):
       ret.openpilotLongitudinalControl = Params().get_bool("DisableRadar")
 
       ret.pcmCruise = not ret.openpilotLongitudinalControl
-      ret.communityFeature = ret.openpilotLongitudinalControl
     else:
-      ret.safetyModel = car.CarParams.SafetyModel.hondaNidec
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hondaNidec)]
       ret.enableGasInterceptor = 0x201 in fingerprint[0]
       ret.openpilotLongitudinalControl = True
 
@@ -73,6 +51,10 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.CRV_5G:
       ret.enableBsm = 0x12f8bfa7 in fingerprint[0]
+
+    # Detect Bosch cars with new HUD msgs
+    if any(0x33DA in f for f in fingerprint.values()):
+      ret.flags |= HondaFlags.BOSCH_EXT_HUD.value
 
     # Accord 1.5T CVT has different gearbox message
     if candidate == CAR.ACCORD and 0x191 in fingerprint[1]:
@@ -86,11 +68,16 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
     ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
 
-    # default longitudinal tuning for all hondas
-    ret.longitudinalTuning.kpBP = [0., 5., 35.]
-    ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
-    ret.longitudinalTuning.kiBP = [0., 35.]
-    ret.longitudinalTuning.kiV = [0.18, 0.12]
+    if candidate in HONDA_BOSCH:
+      ret.longitudinalTuning.kpV = [0.25]
+      ret.longitudinalTuning.kiV = [0.05]
+      ret.longitudinalActuatorDelayUpperBound = 0.5 # s
+    else:
+      # default longitudinal tuning for all hondas
+      ret.longitudinalTuning.kpBP = [0., 5., 35.]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
+      ret.longitudinalTuning.kiBP = [0., 35.]
+      ret.longitudinalTuning.kiV = [0.18, 0.12]
 
     eps_modified = False
     for fw in car_fw:
@@ -160,6 +147,7 @@ class CarInterface(CarInterfaceBase):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1000], [0, 1000]]  # TODO: determine if there is a dead zone at the top end
       tire_stiffness_factor = 0.444
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.8], [0.24]]
+      ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.CRV_5G:
       stop_and_go = True
@@ -177,6 +165,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.64], [0.192]]
       tire_stiffness_factor = 0.677
+      ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.CRV_HYBRID:
       stop_and_go = True
@@ -187,6 +176,7 @@ class CarInterface(CarInterfaceBase):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
       tire_stiffness_factor = 0.677
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.6], [0.18]]
+      ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.FIT:
       stop_and_go = False
@@ -195,6 +185,17 @@ class CarInterface(CarInterfaceBase):
       ret.centerToFront = ret.wheelbase * 0.39
       ret.steerRatio = 13.06
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
+      tire_stiffness_factor = 0.75
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.05]]
+
+    elif candidate == CAR.FREED:
+      stop_and_go = False
+      ret.mass = 3086. * CV.LB_TO_KG + STD_CARGO_KG
+      ret.wheelbase = 2.74
+      # the remaining parameters were copied from FIT
+      ret.centerToFront = ret.wheelbase * 0.39
+      ret.steerRatio = 13.06
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
       tire_stiffness_factor = 0.75
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.05]]
 
@@ -207,6 +208,7 @@ class CarInterface(CarInterfaceBase):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
       tire_stiffness_factor = 0.5
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.16], [0.025]]
+      ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.ACURA_RDX:
       stop_and_go = False
@@ -225,7 +227,7 @@ class CarInterface(CarInterfaceBase):
       ret.centerToFront = ret.wheelbase * 0.41
       ret.steerRatio = 11.95  # as spec
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.6], [0.18]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.06]]
       tire_stiffness_factor = 0.677
 
     elif candidate == CAR.ODYSSEY:
@@ -258,6 +260,16 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.444
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]]
 
+    elif candidate == CAR.PASSPORT:
+      stop_and_go = False
+      ret.mass = 4204. * CV.LB_TO_KG + STD_CARGO_KG  # average weight
+      ret.wheelbase = 2.82
+      ret.centerToFront = ret.wheelbase * 0.428
+      ret.steerRatio = 17.25  # as spec
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
+      tire_stiffness_factor = 0.444
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]]
+
     elif candidate == CAR.RIDGELINE:
       stop_and_go = False
       ret.mass = 4515. * CV.LB_TO_KG + STD_CARGO_KG
@@ -278,15 +290,29 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.82
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.6], [0.18]]
 
+    elif candidate == CAR.HONDA_E:
+      stop_and_go = True
+      ret.mass = 3338.8 * CV.LB_TO_KG + STD_CARGO_KG
+      ret.wheelbase = 2.5
+      ret.centerToFront = ret.wheelbase * 0.5
+      ret.steerRatio = 16.71
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
+      tire_stiffness_factor = 0.82
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.6], [0.18]] # TODO: can probably use some tuning
+
     else:
-      raise ValueError("unsupported car %s" % candidate)
+      raise ValueError(f"unsupported car {candidate}")
 
     # These cars use alternate user brake msg (0x1BE)
     if candidate in HONDA_BOSCH_ALT_BRAKE_SIGNAL:
-      ret.safetyParam |= Panda.FLAG_HONDA_ALT_BRAKE
+      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HONDA_ALT_BRAKE
+
+    # These cars use alternate SCM messages (SCM_FEEDBACK AND SCM_BUTTON)
+    if candidate in HONDA_NIDEC_ALT_SCM_MESSAGES:
+      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HONDA_NIDEC_ALT
 
     if ret.openpilotLongitudinalControl and candidate in HONDA_BOSCH:
-      ret.safetyParam |= Panda.FLAG_HONDA_BOSCH_LONG
+      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HONDA_BOSCH_LONG
 
     # min speed to enable ACC. if car can do stop and go, then set enabling speed
     # to a negative value, so it won't matter. Otherwise, add 0.5 mph margin to not
@@ -302,8 +328,6 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
                                                                          tire_stiffness_factor=tire_stiffness_factor)
 
-    ret.startAccel = 0.5
-
     ret.steerActuatorDelay = 0.1
     ret.steerRateCost = 0.5
     ret.steerLimitTimer = 0.8
@@ -313,7 +337,7 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def init(CP, logcan, sendcan):
     if CP.carFingerprint in HONDA_BOSCH and CP.openpilotLongitudinalControl:
-      disable_radar(logcan, sendcan)
+      disable_ecu(logcan, sendcan, bus=1, addr=0x18DAB0F1, com_cont_req=b'\x28\x83\x03')
 
   # returns a car.CarState
   def update(self, c, can_strings):
@@ -326,7 +350,6 @@ class CarInterface(CarInterfaceBase):
     ret = self.CS.update(self.cp, self.cp_cam, self.cp_body)
 
     ret.canValid = self.cp.can_valid and self.cp_cam.can_valid and (self.cp_body is None or self.cp_body.can_valid)
-    ret.yawRate = self.VM.yaw_rate(ret.steeringAngleDeg * CV.DEG_TO_RAD, ret.vEgo)
 
     buttonEvents = []
 
@@ -368,8 +391,6 @@ class CarInterface(CarInterfaceBase):
     events = self.create_common_events(ret, pcm_enable=False)
     if self.CS.brake_error:
       events.add(EventName.brakeUnavailable)
-    if self.CS.brake_hold and self.CS.CP.openpilotLongitudinalControl:
-      events.add(EventName.brakeHold)
     if self.CS.park_brake:
       events.add(EventName.parkBrake)
 
@@ -411,21 +432,19 @@ class CarInterface(CarInterfaceBase):
   # pass in a car.CarControl
   # to be called @ 100hz
   def apply(self, c):
-    if c.hudControl.speedVisible:
-      hud_v_cruise = c.hudControl.setSpeed * CV.MS_TO_KPH
+    hud_control = c.hudControl
+    if hud_control.speedVisible:
+      hud_v_cruise = hud_control.setSpeed * CV.MS_TO_KPH
     else:
       hud_v_cruise = 255
 
-    can_sends = self.CC.update(c.enabled, self.CS, self.frame,
-                               c.actuators,
-                               c.cruiseControl.speedOverride,
-                               c.cruiseControl.override,
-                               c.cruiseControl.cancel,
-                               c.cruiseControl.accelOverride,
-                               hud_v_cruise,
-                               c.hudControl.lanesVisible,
-                               hud_show_car=c.hudControl.leadVisible,
-                               hud_alert=c.hudControl.visualAlert)
+    ret = self.CC.update(c.enabled, c.active, self.CS, self.frame,
+                         c.actuators,
+                         c.cruiseControl.cancel,
+                         hud_v_cruise,
+                         hud_control.lanesVisible,
+                         hud_show_car=hud_control.leadVisible,
+                         hud_alert=hud_control.visualAlert)
 
     self.frame += 1
-    return can_sends
+    return ret
