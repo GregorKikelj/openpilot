@@ -97,8 +97,8 @@ class CarInterface(CarInterfaceBase):
         buttonEvents.append(be)
 
     events = self.create_common_events(ret, extra_gears=[GearShifter.eco, GearShifter.sport, GearShifter.manumatic])
-    print(self.CS.engageEvent, self.CS.prevAc)
-    if self.CS.engageEvent:
+    
+    if ret.clutchPressed:
       events.add(EventName.buttonEnable)
     # Vehicle health and operation safety checks
     if self.CS.parkingBrakeSet:
