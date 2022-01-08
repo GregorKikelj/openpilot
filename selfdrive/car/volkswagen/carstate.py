@@ -16,11 +16,20 @@ class CarState(CarStateBase):
     self.get_cam_can_parser = self.get_pq_cam_can_parser
     self.update = self.update_pq
     self.hca_status_values = can_define.dv["Lenkhilfe_2"]["LH2_Sta_HCA"]
+    self.prevAc = None
+    self.engageEvent = False
 
   def update_pq(self, pt_cp, cam_cp, ext_cp, trans_type):
     ret = car.CarState.new_message()
     fan = pt_cp.vl["Klima_1"]["Geblaeselast_4_1"]
-    print(fan)
+    if self.prevAc is None:
+      self.prevAc=fan
+
+    if self.prevAc != fan:
+      self.enageEvent=True
+    else:
+      self.engageEvent = False
+    fan = self.prevAc
     # Update vehicle speed and acceleration from ABS wheel speeds.
     ret.wheelSpeeds.fl = pt_cp.vl["Bremse_3"]["Radgeschw__VL_4_1"] * CV.KPH_TO_MS
     ret.wheelSpeeds.fr = pt_cp.vl["Bremse_3"]["Radgeschw__VR_4_1"] * CV.KPH_TO_MS

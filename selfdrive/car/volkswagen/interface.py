@@ -98,7 +98,7 @@ class CarInterface(CarInterfaceBase):
 
     events = self.create_common_events(ret, extra_gears=[GearShifter.eco, GearShifter.sport, GearShifter.manumatic])
 
-    if ret.leftBlinker:
+    if self.CS.engageEvent:
       events.add(EventName.buttonEnable)
     # Vehicle health and operation safety checks
     if self.CS.parkingBrakeSet:
