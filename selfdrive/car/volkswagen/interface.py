@@ -27,40 +27,13 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "volkswagen"
     ret.radarOffCan = True
 
-    if candidate in PQ_CARS:
-      # Set global PQ35/PQ46/NMS parameters
-      ret.safetyModel = car.CarParams.SafetyModel.volkswagenPq
-      ret.enableBsm = 0x3BA in fingerprint[0]
+    # Set global PQ35/PQ46/NMS parameters
+    ret.safetyModel = car.CarParams.SafetyModel.volkswagenPq
+    ret.enableBsm = 0x3BA in fingerprint[0]
 
-      if 0x440 in fingerprint[0]:  # Getriebe_1 detected: traditional automatic or DSG gearbox
-        ret.transmissionType = TransmissionType.automatic
-      else:  # No trans message at all, must be a true stick-shift manual
-        ret.transmissionType = TransmissionType.manual
+    ret.transmissionType = TransmissionType.manual
+    ret.networkLocation = NetworkLocation.gateway
 
-      if 0x1A0 in fingerprint[1] or 0xAE in fingerprint[1]:
-        ret.networkLocation = NetworkLocation.gateway
-      else:
-        ret.networkLocation = NetworkLocation.fwdCamera
-
-    else:  # pylint: disable=using-constant-test
-      # Set global MQB parameters
-      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.volkswagen)]
-      ret.enableBsm = 0x30F in fingerprint[0]  # SWA_01
-
-      if 0xAD in fingerprint[0]:
-        # Getriebe_11 detected: traditional automatic or DSG gearbox
-        ret.transmissionType = TransmissionType.automatic
-      elif 0x187 in fingerprint[0]:
-        # EV_Gearshift detected: e-Golf or similar direct-drive electric
-        ret.transmissionType = TransmissionType.direct
-      else:
-        # No trans message at all, must be a true stick-shift manual
-        ret.transmissionType = TransmissionType.manual
-
-      if 0xfd in fingerprint[1]:  # ESP_21 present on bus 1, we're hooked up at the CAN gateway
-        ret.networkLocation = NetworkLocation.gateway
-      else:  # We're hooked up at the LKAS camera
-        ret.networkLocation = NetworkLocation.fwdCamera
 
     # Global tuning defaults, can be overridden per-vehicle
     ret.steerActuatorDelay = 0.05
@@ -70,120 +43,22 @@ class CarInterface(CarInterfaceBase):
     tire_stiffness_factor = 1.0  # Let the params learner figure this out
     ret.lateralTuning.pid.kpBP = [0.]
     ret.lateralTuning.pid.kiBP = [0.]
-    ret.lateralTuning.pid.kf = 0.00006
-    ret.lateralTuning.pid.kpV = [0.6]
-    ret.lateralTuning.pid.kiV = [0.2]
+    ret.lateralTuning.pid.kf = 0.0003
+    ret.lateralTuning.pid.kpV = [0.4]
+    ret.lateralTuning.pid.kiV = [0.1]
 
     # Per-chassis tuning values, override tuning defaults here if desired
 
-    if candidate == CAR.ARTEON_MK1:
-      ret.mass = 1733 + STD_CARGO_KG
-      ret.wheelbase = 2.84
-
-    elif candidate == CAR.ATLAS_MK1:
-      ret.mass = 2011 + STD_CARGO_KG
-      ret.wheelbase = 2.98
-
-    elif candidate == CAR.GOLF_MK6:
-      ret.mass = 1379 + STD_CARGO_KG
-      ret.wheelbase = 2.58
-      ret.minSteerSpeed = 50 * CV.KPH_TO_MS  # May be lower depending on model-year/EPS FW
-
-    elif candidate == CAR.GOLF_MK7:
-      ret.mass = 1397 + STD_CARGO_KG
-      ret.wheelbase = 2.62
-
-    elif candidate == CAR.JETTA_MK7:
-      ret.mass = 1328 + STD_CARGO_KG
-      ret.wheelbase = 2.71
-
-    elif candidate == CAR.PASSAT_MK8:
-      ret.mass = 1551 + STD_CARGO_KG
-      ret.wheelbase = 2.79
-
-    elif candidate == CAR.PASSAT_NMS:
-      ret.mass = 1503 + STD_CARGO_KG
-      ret.wheelbase = 2.80
-      ret.minSteerSpeed = 50 * CV.KPH_TO_MS  # May be lower depending on model-year/EPS FW
-    elif candidate == CAR.POLO_MK6:
-      ret.mass = 1230 + STD_CARGO_KG
-      ret.wheelbase = 2.55
-
-    elif candidate == CAR.TAOS_MK1:
-      ret.mass = 1498 + STD_CARGO_KG
-      ret.wheelbase = 2.69
-
-    elif candidate == CAR.TCROSS_MK1:
-      ret.mass = 1150 + STD_CARGO_KG
-      ret.wheelbase = 2.60
-
-    elif candidate == CAR.TIGUAN_MK2:
-      ret.mass = 1715 + STD_CARGO_KG
-      ret.wheelbase = 2.74
-
-    elif candidate == CAR.TOURAN_MK2:
-      ret.mass = 1516 + STD_CARGO_KG
-      ret.wheelbase = 2.79
-
-    elif candidate == CAR.TRANSPORTER_T61:
-      ret.mass = 1926 + STD_CARGO_KG
-      ret.wheelbase = 3.00  # SWB, LWB is 3.40, TBD how to detect difference
-      ret.minSteerSpeed = 14.0
-
-    elif candidate == CAR.TROC_MK1:
-      ret.mass = 1413 + STD_CARGO_KG
-      ret.wheelbase = 2.63
-
-    elif candidate == CAR.AUDI_A3_MK3:
-      ret.mass = 1335 + STD_CARGO_KG
-      ret.wheelbase = 2.61
-
-    elif candidate == CAR.AUDI_Q2_MK1:
-      ret.mass = 1205 + STD_CARGO_KG
-      ret.wheelbase = 2.61
-
-    elif candidate == CAR.AUDI_Q3_MK2:
-      # Averages of all 8U/F3/FS Q3 variants
-      ret.mass = 1623 + STD_CARGO_KG
+    if candidate == CAR.GOLF_MK6:
+      ret.mass = 1500 + STD_CARGO_KG
       ret.wheelbase = 2.68
-
-    elif candidate == CAR.SEAT_ATECA_MK1:
-      ret.mass = 1900 + STD_CARGO_KG
-      ret.wheelbase = 2.64
-
-    elif candidate == CAR.SEAT_LEON_MK3:
-      ret.mass = 1227 + STD_CARGO_KG
-      ret.wheelbase = 2.64
-
-    elif candidate == CAR.SKODA_KAMIQ_MK1:
-      ret.mass = 1265 + STD_CARGO_KG
-      ret.wheelbase = 2.66
-
-    elif candidate == CAR.SKODA_KAROQ_MK1:
-      ret.mass = 1278 + STD_CARGO_KG
-      ret.wheelbase = 2.66
-
-    elif candidate == CAR.SKODA_KODIAQ_MK1:
-      ret.mass = 1569 + STD_CARGO_KG
-      ret.wheelbase = 2.79
-
-    elif candidate == CAR.SKODA_OCTAVIA_MK3:
-      ret.mass = 1388 + STD_CARGO_KG
-      ret.wheelbase = 2.68
-
-    elif candidate == CAR.SKODA_SCALA_MK1:
-      ret.mass = 1192 + STD_CARGO_KG
-      ret.wheelbase = 2.65
-
-    elif candidate == CAR.SKODA_SUPERB_MK3:
-      ret.mass = 1505 + STD_CARGO_KG
-      ret.wheelbase = 2.84
+      ret.minSteerSpeed = 0 * CV.KPH_TO_MS
 
     else:
       raise ValueError(f"unsupported car {candidate}")
 
     ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
-    ret.centerToFront = ret.wheelbase * 0.45
+    ret.centerToFront = ret.wheelbase * 0.4
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
                                                                          tire_stiffness_factor=tire_stiffness_factor)
     return ret
@@ -219,6 +94,8 @@ class CarInterface(CarInterfaceBase):
 
     events = self.create_common_events(ret, extra_gears=[GearShifter.eco, GearShifter.sport, GearShifter.manumatic])
 
+    if self.CS.leftBlinker:
+      events.add(EventName.buttonEnable)
     # Vehicle health and operation safety checks
     if self.CS.parkingBrakeSet:
       events.add(EventName.parkBrake)
