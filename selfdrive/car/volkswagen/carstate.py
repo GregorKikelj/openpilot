@@ -4,7 +4,7 @@ from selfdrive.config import Conversions as CV
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.volkswagen.values import PQ_CARS, DBC_FILES, CANBUS, NetworkLocation, TransmissionType, GearShifter, BUTTON_STATES, CarControllerParams
+from selfdrive.car.volkswagen.values import DBC_FILES, CANBUS, NetworkLocation, TransmissionType, GearShifter, BUTTON_STATES, CarControllerParams
 
 class CarState(CarStateBase):
   def __init__(self, CP):
@@ -19,6 +19,8 @@ class CarState(CarStateBase):
 
   def update_pq(self, pt_cp, cam_cp, ext_cp, trans_type):
     ret = car.CarState.new_message()
+    fan = pt_cp.vl["Klima_1"]["Geblaeselast_4_1"]
+    print(fan)
     # Update vehicle speed and acceleration from ABS wheel speeds.
     ret.wheelSpeeds.fl = pt_cp.vl["Bremse_3"]["Radgeschw__VL_4_1"] * CV.KPH_TO_MS
     ret.wheelSpeeds.fr = pt_cp.vl["Bremse_3"]["Radgeschw__VR_4_1"] * CV.KPH_TO_MS
@@ -190,6 +192,7 @@ class CarState(CarStateBase):
       ("GRA_Zeitluecke", "GRA_Neu", 0),             # ACC button, time gap adj
       ("GRA_Neu_Zaehler", "GRA_Neu", 0),            # ACC button, time gap adj
       ("GRA_Sender", "GRA_Neu", 0),                 # GRA Sender Coding
+      ("Geblaeselast_4_1", "Klima_1", 0),           # AC blower fan, because there's no CC
     ]
 
     checks = [
