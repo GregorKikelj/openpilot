@@ -29,7 +29,7 @@ class CarState(CarStateBase):
       self.enageEvent=True
     else:
       self.engageEvent = False
-    fan = self.prevAc
+    self.prevAc = fan
     # Update vehicle speed and acceleration from ABS wheel speeds.
     ret.wheelSpeeds.fl = pt_cp.vl["Bremse_3"]["Radgeschw__VL_4_1"] * CV.KPH_TO_MS
     ret.wheelSpeeds.fr = pt_cp.vl["Bremse_3"]["Radgeschw__VR_4_1"] * CV.KPH_TO_MS
