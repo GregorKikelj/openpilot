@@ -102,14 +102,14 @@ class ModelControls:
       self.IMU_alpha[i] = np.roll(self.IMU_alpha[i], -1)
       self.IMU_alpha[i][-1] = IMU_alpha[i]
     
-  def predict_torque(self, lat_plan, CP, VM, angle_offset, CS):
+  def predict_torque(self, lat_plan, CP, VM, angle_offset, CS, params):
     # Compute desired steering angle profile 
     steering_angle = [0]*len(fwd_data)
     for i in range(len(fwd_data)):
       CP.steerActuatorDelay = -0.2 + fwd_data[i]/100
       desired_curvature, _ = get_lag_adjusted_curvature(CP, self.v[-1], lat_plan.psis, lat_plan.curvatures, lat_plan.curvatureRates)
 
-      steering_angle[i] = math.degrees(VM.get_steer_from_curvature(-desired_curvature, self.v[-1])) + angle_offset
+      steering_angle[i] = math.degrees(VM.get_steer_from_curvature(-desired_curvature, self.v[-1], params.roll)) + angle_offset
 
     # TODO: consider adding
     # steering_angle = [CS.steeringAngleDeg] + steering_angle
@@ -202,7 +202,7 @@ class LatControlPID():
       self.model.parse_logs(CS.steeringAngleDeg, CS.vEgo, self.M, self.IMU_v, self.IMU_alpha)
 
       if self.count % 2 == 0:
-        self.model.predict_torque(lat_plan, CP, VM, params.angleOffsetDeg, CS)
+        self.model.predict_torque(lat_plan, CP, VM, params.angleOffsetDeg, CS, params)
         CP.steerActuatorDelay = self.CP_actuatorDelay
 
       if self.model.active:
