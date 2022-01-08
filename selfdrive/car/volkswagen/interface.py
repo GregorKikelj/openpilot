@@ -28,7 +28,8 @@ class CarInterface(CarInterfaceBase):
     ret.radarOffCan = True
 
     # Set global PQ35/PQ46/NMS parameters
-    ret.safetyModel = car.CarParams.SafetyModel.volkswagenPq
+    # ret.safetyModel = car.CarParams.SafetyModel.volkswagenPq
+    ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.volkswagenPq)]
     ret.enableBsm = 0x3BA in fingerprint[0]
 
     ret.transmissionType = TransmissionType.manual
