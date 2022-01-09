@@ -57,7 +57,7 @@ class CarState(CarStateBase):
     ret.gas = pt_cp.vl["Motor_3"]["Fahrpedal_Rohsignal"] / 100.0
     ret.gasPressed = ret.gas > 0
     ret.brake = pt_cp.vl["Bremse_5"]["Bremsdruck"] / 250.0  # FIXME: this is pressure in Bar, not sure what OP expects
-    ret.brakePressed = bool(pt_cp.vl["Motor_2"]["Bremstestschalter"])
+    ret.brakePressed = pt_cp.vl["Bremse_5"]["Bremsdruck"] > 200 and ret.vEgo > 1
 
     # Update door and trunk/hatch lid open status.
     # TODO: need to locate signals for other three doors if possible
