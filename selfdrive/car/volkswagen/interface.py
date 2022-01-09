@@ -37,8 +37,8 @@ class CarInterface(CarInterfaceBase):
 
 
     # Global tuning defaults, can be overridden per-vehicle
-    ret.steerActuatorDelay = -0.1
-    ret.steerRateCost = 1.0
+    ret.steerActuatorDelay = 0
+    ret.steerRateCost = 0.8
     ret.steerLimitTimer = 0.4
     ret.steerRatio = 15.6  # Let the params learner figure this out
     tire_stiffness_factor = 1.0  # Let the params learner figure this out
@@ -54,7 +54,7 @@ class CarInterface(CarInterfaceBase):
     # Per-chassis tuning values, override tuning defaults here if desired
 
     if candidate == CAR.GOLF_MK6:
-      ret.mass = 1500 + STD_CARGO_KG
+      ret.mass = 1600 + STD_CARGO_KG
       ret.wheelbase = 2.68
       ret.minSteerSpeed = 0 * CV.KPH_TO_MS
 
