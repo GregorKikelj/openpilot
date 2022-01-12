@@ -161,8 +161,7 @@ class CarController():
         acceleration = mass*desiredAcceleration
 
         powerNeeded = (drag+friction+acceleration)*speed
-        POWER_LOOKUP_BP = [0, 75000] #75 kw/100 hp to keep in efficient region
-        
+        POWER_LOOKUP_BP = [0, 75] #75 kw/100 hp to keep in efficient region
         PEDAL_LOOKUP_BP = [P.ZERO_GAS, P.MAX_GAS*100/140] #Not max gas, max gas gives 140hp, we want at most 100 hp
         apply_gas = int(round(interp(powerNeeded, POWER_LOOKUP_BP, PEDAL_LOOKUP_BP)))
 
