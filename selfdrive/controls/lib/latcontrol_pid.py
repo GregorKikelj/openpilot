@@ -7,10 +7,10 @@ from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
 
 
-class LatControlModel:
+class LatControlPID:
   def __init__(self, CP):
     # Model generated using Konverter: https://github.com/sshane/Konverter
-    model_weights_file = '/data/openpilot/grekiki_weights.npz'
+    model_weights_file = '/data/openpilot/grekiki_model.h5'
     self.w, self.b = np.load(model_weights_file, allow_pickle=True)['wb']
 
     self.use_accel = self.w[0].shape[0] == 6  # 6 inputs is accel models
