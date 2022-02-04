@@ -10,7 +10,8 @@ from common.realtime import DT_CTRL
 class LatControlPID:
   def __init__(self, CP):
     # Model generated using Konverter: https://github.com/sshane/Konverter
-    model_weights_file = '/data/openpilot/grekiki_model.h5'
+    model_weights_file = '/data/openpilot/grekiki_model_weights.npz'
+    # model_weights_file = '/home/gregor/openpilot/grekiki_model_weights.npz'
     self.w, self.b = np.load(model_weights_file, allow_pickle=True)['wb']
 
     self.use_accel = self.w[0].shape[0] == 6  # 6 inputs is accel models
@@ -47,17 +48,18 @@ class LatControlPID:
   def update(self, active, CS, CP, VM, params, desired_curvature, desired_curvature_rate):
     model_log = log.ControlsState.LateralPIDState.new_message()
 
-    angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo))
+    angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
 
     if CS.vEgo < 0.15 or not active:
       output_steer = 0.0
+      model_log.active=False
     else:
       steers_max = get_steer_max(CP, CS.vEgo)
       pos_limit = steers_max
       neg_limit = -steers_max
 
-      rate_des = VM.get_steer_from_curvature(-desired_curvature_rate, CS.vEgo)
+      rate_des = VM.get_steer_from_curvature(-desired_curvature_rate, CS.vEgo, params.roll)
 
       # TODO: Can be sluggish when model is given rates, the issue is probably with the training data,
       # specifically the disturbances/perturbations fed into the model to recover from large errors
@@ -76,5 +78,9 @@ class LatControlPID:
         _90_degree_bp = interp(CS.vEgo, [17.8816, 31.2928], [1., 1.1])  # 40 to 70 mph, 90 degree brakepoint
         multiplier = interp(abs(CS.steeringAngleDeg), [0, 90.], [1.27, _90_degree_bp])
         output_steer = float(output_steer * multiplier)
+      
+      model_log.active = True
+      model_log.output = output_steer
+      model_log.steeringAngleDesiredDeg = angle_steers_des
 
     return output_steer, angle_steers_des, model_log
