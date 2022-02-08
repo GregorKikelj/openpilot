@@ -86,11 +86,11 @@ class LanePlanner:
     self.lane_width_certainty.update(l_prob * r_prob)
     current_lane_width = abs(self.rll_y[0] - self.lll_y[0])
     self.lane_width_estimate.update(current_lane_width)
-    speed_lane_width = interp(v_ego, [0., 31.], [2.8, 3.5])
+    speed_lane_width = interp(v_ego, [50/3.6, 90/3.6, 100/3.6], [2.5, 3.0, 3.75])*0.8 #Keep 10% free on each side
     self.lane_width = self.lane_width_certainty.x * self.lane_width_estimate.x + \
                       (1 - self.lane_width_certainty.x) * speed_lane_width
 
-    clipped_lane_width = min(4.0, self.lane_width)
+    clipped_lane_width = min(3.75, self.lane_width)
     path_from_left_lane = self.lll_y + clipped_lane_width / 2.0
     path_from_right_lane = self.rll_y - clipped_lane_width / 2.0
 
@@ -102,4 +102,7 @@ class LanePlanner:
       path_xyz[:,1] = self.d_prob * lane_path_y_interp + (1.0 - self.d_prob) * path_xyz[:,1]
     else:
       cloudlog.warning("Lateral mpc - NaNs in laneline times, ignoring")
+    
+    hug_left = interp(v_ego, [40/3.6, 60/3.6, 90/3.6, 100/3.6], [0.11, 0.09, 0.04, 0]) #Above 90 is highway speed
+    path_xyz[:, 1] -= hug_left
     return path_xyz
