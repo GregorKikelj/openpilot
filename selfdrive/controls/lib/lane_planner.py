@@ -66,15 +66,8 @@ class LanePlanner:
     # Reduce reliance on lanelines that are too far apart or
     # will be in a few seconds
     path_xyz[:, 1] -= self.path_offset
-    l_prob, r_prob = self.lll_prob, self.rll_prob
+    l_prob, r_prob = self.lll_prob, 0 #Right laneline sucks
     width_pts = self.rll_y - self.lll_y
-    prob_mods = []
-    for t_check in [0.0, 1.5, 3.0]:
-      width_at_t = interp(t_check * (v_ego + 7), self.ll_x, width_pts)
-      prob_mods.append(interp(width_at_t, [4.0, 5.0], [1.0, 0.0]))
-    mod = min(prob_mods)
-    l_prob *= mod
-    r_prob *= mod
 
     # Reduce reliance on uncertain lanelines
     l_std_mod = interp(self.lll_std, [.15, .3], [1.0, 0.0])
@@ -86,16 +79,14 @@ class LanePlanner:
     self.lane_width_certainty.update(l_prob * r_prob)
     current_lane_width = abs(self.rll_y[0] - self.lll_y[0])
     self.lane_width_estimate.update(current_lane_width)
-    speed_lane_width = interp(v_ego, [50/3.6, 90/3.6, 100/3.6], [2.5, 3.0, 3.75])*0.9 #Keep 10% free on each side
-    self.lane_width = self.lane_width_certainty.x * self.lane_width_estimate.x + \
-                      (1 - self.lane_width_certainty.x) * speed_lane_width
+    speed_lane_width = interp(v_ego, [50/3.6, 90/3.6, 100/3.6], [2.5, 2.8, 3.75])*0.9 #Keep 10% free on each side
+    self.lane_width = speed_lane_width
 
     clipped_lane_width = min(3.75, self.lane_width)
     path_from_left_lane = self.lll_y + clipped_lane_width / 2.0
-    path_from_right_lane = self.rll_y - clipped_lane_width / 2.0
 
-    self.d_prob = l_prob + r_prob - l_prob * r_prob
-    lane_path_y = (l_prob * path_from_left_lane + r_prob * path_from_right_lane) / (l_prob + r_prob + 0.0001)
+    self.d_prob = l_prob
+    lane_path_y = path_from_left_lane
     safe_idxs = np.isfinite(self.ll_t)
     if safe_idxs[0]:
       lane_path_y_interp = np.interp(path_t, self.ll_t[safe_idxs], lane_path_y[safe_idxs])
@@ -103,6 +94,6 @@ class LanePlanner:
     else:
       cloudlog.warning("Lateral mpc - NaNs in laneline times, ignoring")
     
-    hug_left = interp(v_ego, [40/3.6, 60/3.6, 90/3.6, 100/3.6], [0.17, 0.14, 0.09, 0]) #Above 90 is highway speed
+    hug_left = interp(v_ego, [40/3.6, 60/3.6, 90/3.6, 100/3.6], [0.11, 0.09, 0.07, 0])
     path_xyz[:, 1] -= hug_left
     return path_xyz
