@@ -37,7 +37,7 @@ class CarInterface(CarInterfaceBase):
 
 
     # Global tuning defaults, can be overridden per-vehicle
-    ret.steerActuatorDelay = 0
+    ret.steerActuatorDelay = 0.12
     ret.steerRateCost = 0.8
     ret.steerLimitTimer = 0.4
     ret.steerRatio = 15.6  # Let the params learner figure this out
