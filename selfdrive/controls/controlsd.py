@@ -2,7 +2,10 @@
 import os
 import math
 from numbers import Number
-
+from selfdrive.controls.lib.drive_helpers import CONTROL_N
+from selfdrive.modeld.constants import T_IDXS
+from common.numpy_fast import clip, interp
+from common.realtime import DT_CTRL
 from cereal import car, log
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot, config_realtime_process, Priority, Ratekeeper, DT_CTRL
@@ -489,19 +492,25 @@ class Controls:
     if not self.active:
       self.LaC.reset()
       self.LoC.reset(v_pid=CS.vEgo)
-
     if not self.joystick_mode:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
       actuators.accel = self.LoC.update(self.active, CS, self.CP, long_plan, pid_accel_limits, t_since_plan)
-
+      
+      with open("dump_long.txt", "a") as f:
+        f.write("a %f\n" % (interp(0.2, T_IDXS[:CONTROL_N], long_plan.speeds)))
+        f.write("b %f\n" % (long_plan.speeds[0]))
       # Steering PID loop and lateral MPC
       lat_active = self.active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and CS.vEgo > self.CP.minSteerSpeed
       desired_curvature, desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
                                                                              lat_plan.psis,
                                                                              lat_plan.curvatures,
                                                                              lat_plan.curvatureRates)
+
+      with open("dump.txt", "a") as f:
+        f.write("a %f\n" % (interp(0.2, T_IDXS[:CONTROL_N], lat_plan.curvatures)))
+        f.write("b %f\n" % (lat_plan.curvatures[0]))
       actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(lat_active, CS, self.CP, self.VM, params, self.last_actuators,
                                                                              desired_curvature, desired_curvature_rate)
     else:
