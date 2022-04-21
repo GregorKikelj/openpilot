@@ -24,7 +24,7 @@ class TestCarInterfaces(unittest.TestCase):
       2: fingerprint,
     }
 
-    car_fw = []
+    car_fw = [] # type: ignore
 
     car_params = CarInterface.get_params(car_name, fingerprints, car_fw)
     car_interface = CarInterface(car_params, CarController, CarState)

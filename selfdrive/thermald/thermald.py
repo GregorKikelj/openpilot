@@ -6,7 +6,7 @@ import threading
 import time
 from collections import OrderedDict, namedtuple
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import psutil
 
@@ -60,13 +60,13 @@ def populate_tz_by_type():
     with open(os.path.join("/sys/devices/virtual/thermal", n, "type")) as f:
       tz_by_type[f.read().strip()] = int(n.lstrip("thermal_zone"))
 
-def read_tz(x):
+def read_tz(x: Union[None, str, int]) -> int:
   if x is None:
     return 0
-
   if isinstance(x, str):
     if tz_by_type is None:
       populate_tz_by_type()
+    assert(tz_by_type is not None)
     x = tz_by_type[x]
 
   try:
@@ -97,9 +97,9 @@ def hw_state_thread(end_event, hw_queue):
   """Handles non critical hardware state, and sends over queue"""
   count = 0
   registered_count = 0
-  prev_hw_state = None
+  prev_hw_state: Optional[HardwareState] = None
 
-  modem_version = None
+  modem_version: Optional[str] = None
   modem_nv = None
   modem_configured = False
 
@@ -108,7 +108,7 @@ def hw_state_thread(end_event, hw_queue):
     if (count % int(10. / DT_TRML)) == 0:
       try:
         network_type = HARDWARE.get_network_type()
-        modem_temps = HARDWARE.get_modem_temperatures()
+        modem_temps: List[float] = HARDWARE.get_modem_temperatures()
         if len(modem_temps) == 0 and prev_hw_state is not None:
           modem_temps = prev_hw_state.modem_temps
 
@@ -170,8 +170,8 @@ def thermald_thread(end_event, hw_queue):
   startup_conditions: Dict[str, bool] = {}
   startup_conditions_prev: Dict[str, bool] = {}
 
-  off_ts = None
-  started_ts = None
+  off_ts: Optional[int] = None
+  started_ts: Optional[int] = None
   started_seen = False
   thermal_status = ThermalStatus.green
 
@@ -408,7 +408,7 @@ def thermald_thread(end_event, hw_queue):
 
 
 def main():
-  hw_queue = queue.Queue(maxsize=1)
+  hw_queue: queue.Queue = queue.Queue(maxsize=1)
   end_event = threading.Event()
 
   threads = [
