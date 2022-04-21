@@ -77,7 +77,7 @@ class TestEncoder(unittest.TestCase):
         except Exception:
           time.sleep(0.1)
 
-    def check_seg(i):
+    def check_seg(i): # type: ignore
       # check each camera file size
       counts = []
       first_frames = []
