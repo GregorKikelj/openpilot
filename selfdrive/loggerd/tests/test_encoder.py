@@ -37,7 +37,7 @@ class TestEncoder(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     if not TICI:
-      raise unittest.SkipTest
+      raise unittest.SkipTest("Test only works on TICI")
 
   def setUp(self):
     self._clear_logs()
