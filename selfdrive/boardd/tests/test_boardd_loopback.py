@@ -22,11 +22,11 @@ class TestBoardd(unittest.TestCase):
   def setUpClass(cls):
     os.environ['STARTED'] = '1'
     os.environ['BOARDD_LOOPBACK'] = '1'
-    cls.spinner = Spinner()
+    cls.spinner = Spinner() # type: ignore
 
   @classmethod
   def tearDownClass(cls):
-    cls.spinner.close()
+    cls.spinner.close() # type: ignore
 
   @phone_only
   @with_processes(['pandad'])
@@ -61,7 +61,7 @@ class TestBoardd(unittest.TestCase):
 
     n = 200
     for i in range(n):
-      self.spinner.update(f"boardd loopback {i}/{n}")
+      self.spinner.update(f"boardd loopback {i}/{n}") # type: ignore
 
       sent_msgs = defaultdict(set)
       for _ in range(random.randrange(10)):
