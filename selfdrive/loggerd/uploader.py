@@ -7,6 +7,7 @@ import threading
 import time
 import traceback
 from pathlib import Path
+from typing import Union
 
 from cereal import log
 import cereal.messaging as messaging
@@ -64,8 +65,8 @@ class Uploader():
     self.immediate_count = 0
 
     # stats for last successfully uploaded file
-    self.last_time = 0
-    self.last_speed = 0
+    self.last_time = 0.0
+    self.last_speed = 0.0
     self.last_filename = ""
 
     self.immediate_folders = ["crash/", "boot/"]
@@ -97,6 +98,7 @@ class Uploader():
         key = os.path.join(logname, name)
         fn = os.path.join(path, name)
         # skip files already uploaded
+        is_uploaded: Union[bytes, bool]
         try:
           is_uploaded = getxattr(fn, UPLOAD_ATTR_NAME)
         except OSError:

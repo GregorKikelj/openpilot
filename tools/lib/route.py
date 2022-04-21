@@ -3,6 +3,7 @@ import re
 from urllib.parse import urlparse
 from collections import defaultdict
 from itertools import chain
+from typing import Dict
 
 from tools.lib.auth_config import get_token
 from tools.lib.api import CommaApi
@@ -63,7 +64,7 @@ class Route:
     route_files = api.get('v1/route/' + self.name.canonical_name + '/files')
     self.files = list(chain.from_iterable(route_files.values()))
 
-    segments = {}
+    segments: Dict[str, Segment] = {}
     for url in self.files:
       _, dongle_id, time_str, segment_num, fn = urlparse(url).path.rsplit('/', maxsplit=4)
       segment_name = f'{dongle_id}|{time_str}--{segment_num}'
