@@ -34,15 +34,15 @@ def update(msgs, bus, dat, low_to_high, high_to_low, quiet=False):
           change = "-"
 
         if change and not quiet:
-          print(f"{time.monotonic():.2f}\t{hex(y.address)} ({y.address})\t{change}{binascii.hexlify(y.dat)}")
+          print(f"{time.monotonic():.2f}\t{hex(y.address)} ({y.address})\t{change}{binascii.hexlify(y.dat)}") #type: ignore
 
 
 def can_printer(bus=0, init_msgs=None, new_msgs=None, table=False):
   logcan = messaging.sub_sock('can', timeout=10)
 
-  dat = defaultdict(int)
-  low_to_high = defaultdict(int)
-  high_to_low = defaultdict(int)
+  dat: defaultdict = defaultdict(int)
+  low_to_high: defaultdict = defaultdict(int)
+  high_to_low: defaultdict = defaultdict(int)
 
   if init_msgs is not None:
     update(init_msgs, bus, dat, low_to_high, high_to_low, quiet=True)
