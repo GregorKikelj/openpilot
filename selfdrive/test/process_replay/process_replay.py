@@ -6,6 +6,7 @@ import threading
 import time
 import signal
 from collections import namedtuple
+from typing import Optional
 
 import capnp
 from tqdm import tqdm
@@ -362,10 +363,10 @@ def python_replay_process(cfg, lr, fingerprint=None):
 
   fsm = FakeSubMaster(pub_sockets, **cfg.submaster_config)
   fpm = FakePubMaster(sub_sockets)
-  args = (fsm, fpm)
+  args = (fsm, fpm) 
   if 'can' in list(cfg.pub_sub.keys()):
-    can_sock = FakeSocket()
-    args = (fsm, fpm, can_sock)
+    can_sock: Optional[FakeSocket] = FakeSocket()
+    args = (fsm, fpm, can_sock) # type: ignore #TODO tuple grows so mypy is not happy. Could it be a list instead?
 
   all_msgs = sorted(lr, key=lambda msg: msg.logMonoTime)
   pub_msgs = [msg for msg in all_msgs if msg.which() in list(cfg.pub_sub.keys())]
@@ -395,9 +396,10 @@ def python_replay_process(cfg, lr, fingerprint=None):
           os.environ['SKIP_FW_QUERY'] = "1"
           os.environ['FINGERPRINT'] = car_fingerprint
 
-  assert(type(managed_processes[cfg.proc_name]) is PythonProcess)
-  managed_processes[cfg.proc_name].prepare()
-  mod = importlib.import_module(managed_processes[cfg.proc_name].module)
+  process = managed_processes[cfg.proc_name]
+  assert(isinstance(process, PythonProcess))
+  process.prepare()
+  mod = importlib.import_module(process.module)
 
   thread = threading.Thread(target=mod.main, args=args)
   thread.daemon = True
@@ -412,6 +414,7 @@ def python_replay_process(cfg, lr, fingerprint=None):
 
   # wait for started process to be ready
   if 'can' in list(cfg.pub_sub.keys()):
+    assert(isinstance(can_sock, FakeSocket))
     can_sock.wait_for_recv()
   else:
     fsm.wait_for_update()
@@ -426,6 +429,7 @@ def python_replay_process(cfg, lr, fingerprint=None):
       should_recv = bool(len(recv_socks))
 
     if msg.which() == 'can':
+      assert(isinstance(can_sock, FakeSocket))
       can_sock.send(msg.as_builder().to_bytes())
     else:
       msg_queue.append(msg.as_builder())
