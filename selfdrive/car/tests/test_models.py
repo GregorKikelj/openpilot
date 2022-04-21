@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 # pylint: disable=E1101
 import os
 import importlib

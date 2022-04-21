@@ -13,7 +13,7 @@ class TestReaders(unittest.TestCase):
   @unittest.skip("skip for bandwith reasons")
   def test_logreader(self):
     def _check_data(lr):
-      hist = defaultdict(int)
+      hist: defaultdict = defaultdict(int)
       for l in lr:
         hist[l.which()] += 1
 
