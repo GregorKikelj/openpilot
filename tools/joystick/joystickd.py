@@ -3,6 +3,7 @@ import os
 import argparse
 import threading
 from inputs import get_gamepad
+from typing import Union
 
 import cereal.messaging as messaging
 from common.realtime import Ratekeeper
@@ -82,7 +83,7 @@ def send_thread(joystick):
 
 def joystick_thread(use_keyboard):
   Params().put_bool('JoystickDebugMode', True)
-  joystick = Keyboard() if use_keyboard else Joystick()
+  joystick: Union[Keyboard, Joystick] = Keyboard() if use_keyboard else Joystick()
   threading.Thread(target=send_thread, args=(joystick,), daemon=True).start()
   while True:
     joystick.update()

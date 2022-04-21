@@ -5,6 +5,7 @@ import socket
 import time
 from functools import wraps
 from multiprocessing import Process
+from typing import Optional
 
 from common.timeout import Timeout
 
@@ -30,7 +31,7 @@ class EchoSocket():
       while True:
         data = conn.recv(4096)
         if data:
-          print(f'EchoSocket got {data}')
+          print(f'EchoSocket got {data!r}')
           conn.sendall(data)
         else:
           break
@@ -68,7 +69,7 @@ class MockParams():
   def get(self, k, encoding=None):
     ret = MockParams.params.get(k)
     if ret is not None and encoding is not None:
-      ret = ret.decode(encoding)
+      ret = ret.decode(encoding) # type: ignore
     return ret
 
   def put(self, k, v):
@@ -104,12 +105,12 @@ def with_http_server(func):
   @wraps(func)
   def inner(*args, **kwargs):
     with Timeout(2, 'HTTP Server did not start'):
-      p = None
+      p: Optional[Process] = None
       host = '127.0.0.1'
       while p is None or p.exitcode is not None:
         port = random.randrange(40000, 50000)
-        p = Process(target=http.server.test,
-                    kwargs={'port': port, 'HandlerClass': HTTPRequestHandler, 'bind': host})
+        p = Process(target=http.server.test, # type: ignore
+                    kwargs={'port': port, 'HandlerClass': HTTPRequestHandler, 'bind': host}) 
         p.start()
         time.sleep(0.1)
 
