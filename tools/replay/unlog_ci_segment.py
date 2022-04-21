@@ -9,6 +9,7 @@ import termios
 import time
 import tty
 from collections import defaultdict
+from typing import DefaultDict
 
 import cereal.messaging as messaging
 from tools.lib.framereader import FrameReader
@@ -35,7 +36,7 @@ def replay(route, segment, loop):
   frame_idx = {m.roadEncodeIdx.frameId: m.roadEncodeIdx.segmentId for m in msgs if m.which() == 'roadEncodeIdx' and m.roadEncodeIdx.type == 'fullHEVC'}
 
   socks = {}
-  lag = 0
+  lag = 0.0
   i = 0
   max_i = len(msgs) - 2
 
@@ -84,7 +85,8 @@ def replay(route, segment, loop):
           time.sleep(0.01)
 
       # Handle seek
-      dt = defaultdict(int, s=10, S=-10)[key]
+      dict_t: DefaultDict[str, int] = defaultdict(int, s=10, S=-10)
+      dt = dict_t [key]
       new_time = msgs[i].logMonoTime + dt * 1e9
       i = bisect.bisect_left(times, new_time)
 
