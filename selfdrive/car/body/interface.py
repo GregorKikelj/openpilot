@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 import math
 from cereal import car
 from common.realtime import DT_CTRL

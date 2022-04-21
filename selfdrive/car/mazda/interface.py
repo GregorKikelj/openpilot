@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 from cereal import car
 from common.conversions import Conversions as CV
 from selfdrive.car.mazda.values import CAR, LKAS_LIMITS

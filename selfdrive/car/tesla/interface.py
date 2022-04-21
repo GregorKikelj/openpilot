@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 from cereal import car
 from panda import Panda
 from selfdrive.car.tesla.values import CANBUS, CAR
