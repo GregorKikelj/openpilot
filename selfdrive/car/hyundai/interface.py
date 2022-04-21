@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # type: ignore
+
 from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV

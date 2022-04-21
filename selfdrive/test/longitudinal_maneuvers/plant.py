@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# type: ignore
+# TODO can remove type: ignore if there weren't static variables
 import time
 import numpy as np
 
