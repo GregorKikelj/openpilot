@@ -16,8 +16,8 @@ class CommaApi():
       if resp.status_code in [401, 403]:
         raise UnauthorizedError('Unauthorized. Authenticate with tools/lib/auth.py')
 
-      e = APIError(str(resp.status_code) + ":" + resp_json.get('description', str(resp_json['error'])))
-      e.status_code = resp.status_code
+      e: APIError = APIError(str(resp.status_code) + ":" + resp_json.get('description', str(resp_json['error'])))
+      e.status_code = resp.status_code # type: ignore
       raise e
     return resp_json
 

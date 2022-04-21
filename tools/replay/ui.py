@@ -6,6 +6,7 @@ import sys
 import cv2  # pylint: disable=import-error
 import numpy as np
 import pygame  # pylint: disable=import-error
+from typing import Optional
 
 import cereal.messaging as messaging
 from common.numpy_fast import clip
@@ -58,7 +59,7 @@ def ui_thread(addr):
                             'liveTracks', 'modelV2', 'liveParameters', 'lateralPlan'], addr=addr)
 
   img = np.zeros((480, 640, 3), dtype='uint8')
-  imgff = None
+  imgff: Optional[np.ndarray] = None
   num_px = 0
   calibration = None
 
@@ -123,6 +124,7 @@ def ui_thread(addr):
       imgff = np.zeros(imgff_shape, dtype=np.uint8)
 
     imgff = np.frombuffer(rgb_img_raw, dtype=np.uint8).reshape((vipc_client.height, vipc_client.width, 3))
+    assert(isinstance(imgff, np.ndarray))
     imgff = imgff[:, :, ::-1]  # Convert BGR to RGB
     zoom_matrix = _BB_TO_FULL_FRAME[num_px]
     cv2.warpAffine(imgff, zoom_matrix[:2], (img.shape[1], img.shape[0]), dst=img, flags=cv2.WARP_INVERSE_MAP)
