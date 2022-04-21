@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import mpld3
 import sys
 from collections import defaultdict
+from typing import Dict, List
 
 from tools.lib.logreader import logreader_from_route_or_segment
     
@@ -29,8 +30,8 @@ SERVICE_TO_DURATIONS = {
 }
 
 def read_logs(lr):
-  data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-  mono_to_frame = {}
+  data: defaultdict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+  mono_to_frame: Dict[int, int] = {}
   frame_mismatches = []
   latest_sendcan_monotime = 0
   for msg in lr:
@@ -153,7 +154,7 @@ def graph_timestamps(timestamps, start_times, end_times, relative):
   colors = ['blue', 'green', 'red', 'yellow', 'purple']
   assert len(colors) == len(SERVICES), 'Each service needs a color'
 
-  points = {"x": [], "y": [], "labels": []}
+  points: Dict[str, List[float]] = {"x": [], "y": [], "labels": []}
   for frame_id, services in timestamps.items():
     if relative:
       t0 = start_times[frame_id][SERVICES[0]]

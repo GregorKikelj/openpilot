@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 from cereal import car
 from common.conversions import Conversions as CV
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
