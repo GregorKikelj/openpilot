@@ -25,7 +25,7 @@ class TestCamerad(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     if not TICI:
-      raise unittest.SkipTest
+      raise unittest.SkipTest("Test only runs on TICI")
 
   @with_processes(['camerad'])
   def test_frame_packets(self):
