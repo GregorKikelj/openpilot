@@ -110,7 +110,7 @@ class TestStartup(unittest.TestCase):
       time.sleep(0.01)
       msgs = messaging.drain_sock(controls_sock)
       if len(msgs):
-        event_name = msgs[0].controlsState.alertType.split("/")[0]
+        event_name = msgs[0].controlsState.alertType.split("/")[0] # type: ignore
         self.assertEqual(EVENT_NAME[expected_event], event_name,
                          f"expected {EVENT_NAME[expected_event]} for '{car_model}', got {event_name}")
         break

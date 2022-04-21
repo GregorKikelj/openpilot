@@ -15,7 +15,7 @@ class TestCamerad(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     if not TICI:
-      raise unittest.SkipTest
+      raise unittest.SkipTest("Test only runs on TICI")
 
   def _numpy_rgb2gray(self, im):
     ret = np.clip(im[:,:,2] * 0.114 + im[:,:,1] * 0.587 + im[:,:,0] * 0.299, 0, 255).astype(np.uint8)
