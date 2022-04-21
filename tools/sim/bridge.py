@@ -43,8 +43,8 @@ sm = messaging.SubMaster(['carControl', 'controlsState'])
 
 class VehicleState:
   def __init__(self):
-    self.speed = 0
-    self.angle = 0
+    self.speed = 0.0
+    self.angle = 0.0
     self.bearing_deg = 0.0
     self.vel = carla.Vector3D()
     self.cruise_button = 0
@@ -109,7 +109,7 @@ class Camerad:
     rgb_cl = cl_array.to_device(self.queue, rgb)
     yuv_cl = cl_array.empty_like(rgb_cl)
     self.krnl(self.queue, (np.int32(self.Wdiv4), np.int32(self.Hdiv4)), None, rgb_cl.data, yuv_cl.data).wait()
-    yuv = np.resize(yuv_cl.get(), np.int32(rgb.size / 2))
+    yuv = np.resize(yuv_cl.get(), rgb.size // 2)
     eof = int(frame_id * 0.05 * 1e9)
 
     # TODO: remove RGB send once the last RGB vipc subscriber is removed
@@ -325,11 +325,11 @@ def bridge(q):
   vc = carla.VehicleControl(throttle=0, steer=0, brake=0, reverse=False)
 
   is_openpilot_engaged = False
-  throttle_out = steer_out = brake_out = 0
-  throttle_op = steer_op = brake_op = 0
-  throttle_manual = steer_manual = brake_manual = 0
+  throttle_out = steer_out = brake_out = 0.0
+  throttle_op = steer_op = brake_op = 0.0
+  throttle_manual = steer_manual = brake_manual = 0.0
 
-  old_steer = old_brake = old_throttle = 0
+  old_steer = old_brake = old_throttle = 0.0
   throttle_manual_multiplier = 0.7  # keyboard signal is always 1
   brake_manual_multiplier = 0.7  # keyboard signal is always 1
   steer_manual_multiplier = 45 * STEER_RATIO  # keyboard signal is always 1
@@ -341,7 +341,7 @@ def bridge(q):
 
     cruise_button = 0
     throttle_out = steer_out = brake_out = 0.0
-    throttle_op = steer_op = brake_op = 0
+    throttle_op = steer_op = brake_op = 0.0
     throttle_manual = steer_manual = brake_manual = 0.0
 
     # --------------Step 1-------------------------------
