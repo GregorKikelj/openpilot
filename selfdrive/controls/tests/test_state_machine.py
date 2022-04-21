@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 import unittest
+from typing import Dict, List, Union
 
 from cereal import car, log
 from common.realtime import DT_CTRL
 from selfdrive.car.car_helpers import interfaces
 from selfdrive.controls.controlsd import Controls, SOFT_DISABLE_TIME
 from selfdrive.controls.lib.events import Events, ET, Alert, Priority, AlertSize, AlertStatus, VisualAlert, \
-                                          AudibleAlert, EVENTS
+                                          AudibleAlert, EVENTS, AlertCallbackType
 
 State = log.ControlsState.OpenpilotState
 
 # The event types that maintain the current state
-MAINTAIN_STATES = {State.enabled: None, State.disabled: None, State.softDisabling: ET.SOFT_DISABLE,
+MAINTAIN_STATES = {State.enabled: "", State.disabled: "", State.softDisabling: ET.SOFT_DISABLE,
                    State.preEnabled: ET.PRE_ENABLE, State.overriding: ET.OVERRIDE}
 ALL_STATES = tuple(State.schema.enumerants.values())
 # The event types checked in DISABLED section of state machine
 ENABLE_EVENT_TYPES = (ET.ENABLE, ET.PRE_ENABLE, ET.OVERRIDE)
 
 
-def make_event(event_types):
-  event = {}
+def make_event(event_types: List[str]):
+  event: Dict[str, Union[Alert, AlertCallbackType]] = {}
   for ev in event_types:
     event[ev] = Alert("", "", AlertStatus.normal, AlertSize.small, Priority.LOW,
                       VisualAlert.none, AudibleAlert.none, 1.)
