@@ -3,7 +3,7 @@ import os
 import sys
 import time
 from collections import defaultdict
-from typing import Any
+from typing import Any, Tuple
 from itertools import zip_longest
 
 import cereal.messaging as messaging
@@ -33,7 +33,7 @@ def get_log_fn(ref_commit, test_route, tici=True):
   return f"{test_route}_{'model_tici' if tici else 'model'}_{ref_commit}.bz2"
 
 
-def replace_calib(msg, calib):
+def replace_calib(msg, calib:Tuple[float, float, float]):
   msg = msg.as_builder()
   if calib is not None:
     msg.liveCalibration.extrinsicMatrix = get_view_frame_from_road_frame(*calib, 1.22).flatten().tolist()
@@ -61,8 +61,8 @@ def model_replay(lr, frs):
 
     log_msgs = []
     last_desire = None
-    recv_cnt = defaultdict(lambda: 0)
-    frame_idxs = defaultdict(lambda: 0)
+    recv_cnt: defaultdict = defaultdict(int)
+    frame_idxs: defaultdict = defaultdict(int)
 
     # init modeld with valid calibration
     cal_msgs = [msg for msg in lr if msg.which() == "liveCalibration"]
@@ -85,7 +85,7 @@ def model_replay(lr, frs):
 
         if SEND_EXTRA_INPUTS:
           if msg.which() == "liveCalibration":
-            last_calib = list(msg.liveCalibration.rpyCalib)
+            last_calib: Tuple[float, float, float] = tuple(msg.liveCalibration.rpyCalib) # type: ignore
             pm.send(msg.which(), replace_calib(msg, last_calib))
           elif msg.which() == "lateralPlan":
             last_desire = msg.lateralPlan.desire
