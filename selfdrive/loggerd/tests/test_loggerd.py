@@ -227,7 +227,9 @@ class TestLoggerd(unittest.TestCase):
         self.assertEqual(recv_cnt, 0, f"got {recv_cnt} {s} msgs in qlog")
       else:
         # check logged message count matches decimation
-        expected_cnt = (len(msgs) - 1) // service_list[s].decimation + 1
+        decimation = service_list[s].decimation
+        assert(decimation is not None)
+        expected_cnt = (len(msgs) - 1) // decimation + 1
         self.assertEqual(recv_cnt, expected_cnt, f"expected {expected_cnt} msgs for {s}, got {recv_cnt}")
 
   def test_rlog(self):
