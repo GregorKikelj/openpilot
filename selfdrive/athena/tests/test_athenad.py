@@ -22,16 +22,15 @@ from selfdrive.athena.athenad import MAX_RETRY_COUNT, dispatcher
 from selfdrive.athena.tests.helpers import MockWebsocket, MockParams, MockApi, EchoSocket, with_http_server
 from cereal import messaging
 
-
+SOCKET_PORT = 45454
 class TestAthenadMethods(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
-    cls.SOCKET_PORT = 45454
     athenad.Params = MockParams
     athenad.ROOT = tempfile.mkdtemp()
     athenad.SWAGLOG_DIR = swaglog.SWAGLOG_DIR = tempfile.mkdtemp()
-    athenad.Api = MockApi
-    athenad.LOCAL_PORT_WHITELIST = {cls.SOCKET_PORT}
+    athenad.Api = MockApi # type: ignore
+    athenad.LOCAL_PORT_WHITELIST = {SOCKET_PORT}
 
   def setUp(self):
     MockParams.restore_defaults()
@@ -325,16 +324,16 @@ class TestAthenadMethods(unittest.TestCase):
   def test_startLocalProxy(self, mock_create_connection):
     end_event = threading.Event()
 
-    ws_recv = queue.Queue()
-    ws_send = queue.Queue()
-    mock_ws = MockWebsocket(ws_recv, ws_send)
+    ws_recv: queue.Queue = queue.Queue()
+    ws_send: queue.Queue = queue.Queue()
+    mock_ws: MockWebsocket = MockWebsocket(ws_recv, ws_send)
     mock_create_connection.return_value = mock_ws
 
-    echo_socket = EchoSocket(self.SOCKET_PORT)
+    echo_socket = EchoSocket(SOCKET_PORT)
     socket_thread = threading.Thread(target=echo_socket.run)
     socket_thread.start()
 
-    athenad.startLocalProxy(end_event, 'ws://localhost:1234', self.SOCKET_PORT)
+    athenad.startLocalProxy(end_event, 'ws://localhost:1234', SOCKET_PORT)
 
     ws_recv.put_nowait(b'ping')
     try:
@@ -347,7 +346,10 @@ class TestAthenadMethods(unittest.TestCase):
 
   def test_getSshAuthorizedKeys(self):
     keys = dispatcher["getSshAuthorizedKeys"]()
-    self.assertEqual(keys, MockParams().params["GithubSshKeys"].decode('utf-8'))
+    github_ssh_keys = MockParams().params["GithubSshKeys"]
+    if not isinstance(github_ssh_keys, bytes):
+      self.fail("GithubSshKeys is not a bytes object")
+    self.assertEqual(keys, github_ssh_keys.decode('utf-8'))
 
   def test_getVersion(self):
     resp = dispatcher["getVersion"]()
