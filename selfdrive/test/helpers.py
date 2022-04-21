@@ -43,13 +43,13 @@ def with_processes(processes, init_time=0, ignore_stopped=None):
         managed_processes[p].start()
         if n < len(processes) - 1:
           time.sleep(init_time)
-      assert all(managed_processes[name].proc.exitcode is None for name in processes)
+      assert all(managed_proc.exitcode is None for name in processes if (managed_proc := managed_processes[name].proc) is not None)
 
       # call the function
       try:
         func(*args, **kwargs)
         # assert processes are still started
-        assert all(managed_processes[name].proc.exitcode is None for name in processes if name not in ignore_stopped)
+        assert all(managed_proc.exitcode is None for name in processes if name not in ignore_stopped and (managed_proc := managed_processes[name].proc) is not None)
       finally:
         for p in processes:
           managed_processes[p].stop()
