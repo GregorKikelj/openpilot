@@ -6,6 +6,7 @@ import math
 import numbers
 import dictdiffer
 from collections import Counter
+from typing import Union
 
 if "CI" in os.environ:
   def tqdm(x):
@@ -42,6 +43,7 @@ def remove_ignored_fields(msg, ignore):
       except AttributeError:
         break
     else:
+      val: Union[bool, int]
       v = getattr(attr, keys[-1])
       if isinstance(v, bool):
         val = False
@@ -90,7 +92,7 @@ def compare_logs(log1, log2, ignore_fields=None, ignore_msgs=None, tolerance=Non
             a, b = diff[2]
             finite = math.isfinite(a) and math.isfinite(b)
             if finite and isinstance(a, numbers.Number) and isinstance(b, numbers.Number):
-              return abs(a - b) > max(tolerance, tolerance * max(abs(a), abs(b)))
+              return abs(a - b) > max(tolerance, tolerance * max(abs(a), abs(b))) # type: ignore # Numbers don't necessarily support subtraction
         except TypeError:
           pass
         return True
