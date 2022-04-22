@@ -2,7 +2,7 @@ from cereal import car
 from common.numpy_fast import mean
 from opendbc.can.can_define import CANDefine
 from opendbc.can.parser import CANParser
-from selfdrive.car.interfaces import CarStateBase
+from selfdrive.car.interfaces import CarStateBase # type: ignore
 from selfdrive.car.gm.values import DBC, CAR, AccState, CanBus, STEER_THRESHOLD
 
 
@@ -12,6 +12,7 @@ class CarState(CarStateBase):
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
     self.shifter_values = can_define.dv["ECMPRDNL"]["PRNDL"]
     self.lka_steering_cmd_counter = 0
+    self.cruise_buttons = 0
 
   def update(self, pt_cp, loopback_cp):
     ret = car.CarState.new_message()

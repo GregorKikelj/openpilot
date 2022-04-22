@@ -4,13 +4,15 @@ import sys
 import copy
 import json
 import time
+from types import FrameType
 import uuid
 import socket
 import logging
 import traceback
-from threading import local
 from collections import OrderedDict
 from contextlib import contextmanager
+from threading import local
+from typing import Optional, Tuple
 
 LOG_TIMESTAMPS = "LOG_TIMESTAMPS" in os.environ
 
@@ -180,7 +182,7 @@ class SwagLogger(logging.Logger):
     Find the stack frame of the caller so that we can note the source
     file name, line number and function name.
     """
-    f = sys._getframe(3)
+    f: Optional[FrameType] = sys._getframe(3) # pylint: disable=no-member
     #On some versions of IronPython, currentframe() returns None if
     #IronPython isn't run with -X:Frames.
     if f is not None:
@@ -191,8 +193,9 @@ class SwagLogger(logging.Logger):
       stacklevel -= 1
     if not f:
       f = orig_f
-    rv = "(unknown file)", 0, "(unknown function)", None
+    rv: Tuple[str, int, str, Optional[str]] = "(unknown file)", 0, "(unknown function)", None
     while hasattr(f, "f_code"):
+      assert(f is not None)
       co = f.f_code
       filename = os.path.normcase(co.co_filename)
 

@@ -5,7 +5,7 @@ from common.conversions import Conversions as CV
 from selfdrive.swaglog import cloudlog
 import cereal.messaging as messaging
 from selfdrive.car import gen_empty_fingerprint, get_safety_config
-from selfdrive.car.interfaces import CarInterfaceBase
+from selfdrive.car.interfaces import CarInterfaceBase # type: ignore
 
 # mocked car interface to work with chffrplus
 TS = 0.01  # 100Hz

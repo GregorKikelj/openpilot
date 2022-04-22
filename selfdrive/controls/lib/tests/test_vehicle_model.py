@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 from control import StateSpace
 
-from selfdrive.car.honda.interface import CarInterface
+from selfdrive.car.honda.interface import CarInterface # type: ignore
 from selfdrive.car.honda.values import CAR
 from selfdrive.controls.lib.vehicle_model import VehicleModel, dyn_ss_sol, create_dyn_state_matrices
 

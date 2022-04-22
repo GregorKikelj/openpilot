@@ -4,7 +4,7 @@
 import os
 
 from selfdrive.loggerd.config import ROOT, get_available_percent
-from selfdrive.loggerd.tests.loggerd_tests_common import create_random_file
+from selfdrive.loggerd.tests.loggerd_tests_common import create_random_file # type: ignore
 
 
 if __name__ == "__main__":

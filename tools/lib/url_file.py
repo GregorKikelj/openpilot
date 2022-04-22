@@ -192,7 +192,7 @@ class URLFile:
         os.close(local_fd)
 
       self._local_file = local_file
-      self.read = self._local_file.read
-      self.seek = self._local_file.seek
+      self.read = self._local_file.read # type: ignore
+      self.seek = self._local_file.seek # type: ignore
 
     return self._local_file.name

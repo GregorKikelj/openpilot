@@ -45,12 +45,12 @@ def decoder_nvidia(fn, vipc_server, vst, yuv=False):
 
   conv = nvc.PySurfaceConverter(W, H, nvc.PixelFormat.NV12, nvc.PixelFormat.BGR, 0)
   nvDwn = nvc.PySurfaceDownloader(W, H, nvc.PixelFormat.BGR, 0)
-  img = np.ndarray((H,W,3), dtype=np.uint8)
+  img: np.ndarray = np.ndarray((H,W,3), dtype=np.uint8)
 
   if yuv:
     conv_yuv = nvc.PySurfaceConverter(W, H, nvc.PixelFormat.NV12, nvc.PixelFormat.YUV420, 0)
     nvDwn_yuv = nvc.PySurfaceDownloader(W, H, nvc.PixelFormat.YUV420, 0)
-    img_yuv = np.ndarray((H*W//2*3), dtype=np.uint8)
+    img_yuv:np.ndarray = np.ndarray((H*W//2*3), dtype=np.uint8)
 
   cnt = 0
   while 1:

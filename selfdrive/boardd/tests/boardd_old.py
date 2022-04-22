@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 # pylint: skip-file
 
 # This file is not used by openpilot. Only boardd.cc is used.

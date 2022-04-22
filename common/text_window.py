@@ -3,10 +3,11 @@ import os
 import time
 import subprocess
 from common.basedir import BASEDIR
-
+from typing import Optional
 
 class TextWindow:
   def __init__(self, text):
+    self.text_proc: Optional[subprocess.Popen]
     try:
       self.text_proc = subprocess.Popen(["./text", text],
                                         stdin=subprocess.PIPE,

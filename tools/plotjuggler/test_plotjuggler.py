@@ -22,7 +22,9 @@ class TestPlotJuggler(unittest.TestCase):
     output = "\n"
     with Timeout(180, error_msg=output):
       while output.splitlines()[-1] != "Done reading Rlog data":
-        output += p.stderr.readline().decode("utf-8")
+        stderr = p.stderr
+        assert(stderr is not None)
+        output += stderr.readline().decode("utf-8")
 
     # ensure plotjuggler didn't crash after exiting the plugin
     time.sleep(15)

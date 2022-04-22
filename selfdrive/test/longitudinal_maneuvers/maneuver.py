@@ -1,5 +1,5 @@
 import numpy as np
-from selfdrive.test.longitudinal_maneuvers.plant import Plant
+from selfdrive.test.longitudinal_maneuvers.plant import Plant # type: ignore
 
 
 class Maneuver():

@@ -1,3 +1,4 @@
+# type: ignore
 import itertools
 from typing import Any, Dict, Tuple
 

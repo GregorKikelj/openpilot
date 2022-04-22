@@ -1,23 +1,24 @@
 import os
 import subprocess
 from common.basedir import BASEDIR
-
+from typing import Optional
 
 class Spinner():
   def __init__(self):
+    self.spinner_proc: Optional[subprocess.Popen] = None
     try:
       self.spinner_proc = subprocess.Popen(["./spinner"],
                                            stdin=subprocess.PIPE,
                                            cwd=os.path.join(BASEDIR, "selfdrive", "ui"),
                                            close_fds=True)
     except OSError:
-      self.spinner_proc = None
+      pass
 
   def __enter__(self):
     return self
 
   def update(self, spinner_text: str):
-    if self.spinner_proc is not None:
+    if self.spinner_proc is not None and self.spinner_proc.stdin is not None:
       self.spinner_proc.stdin.write(spinner_text.encode('utf8') + b"\n")
       try:
         self.spinner_proc.stdin.flush()
@@ -28,7 +29,7 @@ class Spinner():
     self.update(str(round(100 * cur / total)))
 
   def close(self):
-    if self.spinner_proc is not None:
+    if self.spinner_proc is not None and self.spinner_proc.stdin is not None:
       try:
         self.spinner_proc.stdin.close()
       except BrokenPipeError:

@@ -44,8 +44,8 @@ def get_image(lib, renderer):
   lib.map_renderer_free_image(renderer, buf)
 
   # Convert to numpy
-  r = np.asarray(r)
-  return r.reshape((WIDTH, HEIGHT, 3))
+  r_np:np.ndarray = np.asarray(r)
+  return r_np.reshape((WIDTH, HEIGHT, 3))
 
 
 if __name__ == "__main__":

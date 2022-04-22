@@ -25,7 +25,9 @@ def waste(core):
 
 def main(gctx=None):
   print("1-2 seconds is baseline")
-  for i in range(os.cpu_count()):
+  os_count = os.cpu_count()
+  cpu_count = os_count if os_count is not None else 8
+  for i in range(cpu_count):
     p = Process(target=waste, args=(i,))
     p.start()
 

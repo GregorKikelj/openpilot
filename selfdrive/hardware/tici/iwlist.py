@@ -1,12 +1,12 @@
 import subprocess
-
+from typing import Dict, List, Optional, Union
 
 def scan(interface="wlan0"):
-  result = []
+  result: List[Dict[str, Union[int, str, None]]] = []
   try:
     r = subprocess.check_output(["iwlist", interface, "scan"], encoding='utf8')
 
-    mac = None
+    mac:Optional[str] = None
     for line in r.split('\n'):
       if "Address" in line:
         # Based on the adapter eithere a percentage or dBm is returned

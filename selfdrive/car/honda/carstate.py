@@ -5,7 +5,7 @@ from common.conversions import Conversions as CV
 from common.numpy_fast import interp
 from opendbc.can.can_define import CANDefine
 from opendbc.can.parser import CANParser
-from selfdrive.car.interfaces import CarStateBase
+from selfdrive.car.interfaces import CarStateBase # type: ignore
 from selfdrive.car.honda.values import CAR, DBC, STEER_THRESHOLD, HONDA_BOSCH, HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_ALT_BRAKE_SIGNAL
 
 TransmissionType = car.CarParams.TransmissionType
@@ -166,6 +166,7 @@ class CarState(CarStateBase):
     self.brake_error = False
     self.brake_switch_prev = False
     self.brake_switch_active = False
+    self.cruise_buttons = 0
     self.cruise_setting = 0
     self.v_cruise_pcm_prev = 0
 
