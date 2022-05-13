@@ -66,15 +66,15 @@ def get_normalized_origin(default: Optional[str] = None) -> Optional[str]:
                .replace(":", "/", 1)
 
 
-@cache
+@lru_cache(maxsize=None) # for typing, should replace with @cache in Python 3.9
 def get_version() -> str:
   with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "common", "version.h")) as _versionf:
     version = _versionf.read().split('"')[1]
-  return version
+    return version
 
 @cache
 def get_short_version() -> str:
-  return get_version().split('-')[0]  # type: ignore
+  return get_version().split('-')[0]
 
 @cache
 def is_prebuilt() -> bool:
